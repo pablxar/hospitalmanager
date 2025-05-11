@@ -1,7 +1,6 @@
 import flet as ft
 # Importación del NotificationsPopup
 from components.notifications import NotificationsManager
-from components.notifications import NotificationsPopup
 
 # Simplificación del Header para usar NotificationsManager
 class Header(ft.Container):

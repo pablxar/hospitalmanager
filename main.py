@@ -1,4 +1,5 @@
 import flet as ft
+from flet.core import *
 from components.header import Header
 from components.sidebar import Sidebar
 from components.notifications import NotificationsManager
@@ -27,7 +28,7 @@ class MainApp(ft.Container):
         self.selected_color = "#2E1A47"
 
         #componentes de la app
-        self.notifications_manager = NotificationsManager(page, self.header_color, self.text_color)
+        self.notifications_manager = NotificationsManager(page, self.header_color, self.text_color, self.notify_color)
         self.header = Header(page, self.header_color, self.text_color, self.notify_color, self.change_view, self.notifications_manager)
         self.sidebar = Sidebar(page, self.sidebar_color, self.text_color, self.bg_color, self.selected_color)
 
@@ -41,8 +42,7 @@ class MainApp(ft.Container):
         }
 
         # Agregar el contenedor de notificaciones al layout principal
-        self.page.add(self.notifications_manager.popup.container)
-        #Configuración eventos de la sidebar
+        self.page.overlay.append(self.notifications_manager.popup.container)
 
         self.setup_sidebar_events()
 

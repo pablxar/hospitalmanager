@@ -1,30 +1,70 @@
 import flet as ft
+from flet.core import *
 
-class NotificationsPopup:
-    def __init__(self, page: ft.Page, header_color: str, text_color: str):
-        self.page = page  # Agregar el atributo 'page' aquí
+class NotificationsManager:
+    def __init__(self, page: ft.Page, header_color: str, text_color: str, notify_color: str):
+        self.page = page
         self.header_color = header_color
         self.text_color = text_color
+        self.notify_color = notify_color
+        self.notifications = []
+
+        # Crear el contenedor de notificaciones
         self.container = ft.Container(
-            visible=False,  # Inicialmente oculto
+            visible=False,
             content=ft.Column(
                 controls=[
-                    ft.Text("Notificaciones", color=text_color, weight="bold"),
-                    ft.Column(controls=[], scroll=ft.ScrollMode.AUTO),  # Contenedor de notificaciones
-                    ft.IconButton(
-                        icon=ft.Icons.CLOSE,
-                        tooltip="Cerrar",
-                        on_click=self.close_popup
+                    ft.Row(
+                        controls=[
+                            ft.Text("Notificaciones", color=text_color, weight="bold", size=18),
+                            ft.IconButton(
+                                icon=ft.Icons.CLOSE,
+                                tooltip="Cerrar",
+                                on_click=self.close_popup
+                            )
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                    ),
+                    ft.Divider(color=text_color),
+                    ft.ListView(
+                        expand=True,
+                        spacing=10,
+                        controls=[]  # Contenedor de notificaciones dinámico
                     )
                 ],
                 expand=True
             ),
-            bgcolor=header_color,
-            padding=10,
-            border_radius=10,
-            alignment=ft.alignment.top_right
+            bgcolor=notify_color,
+            padding=20,
+            width=300,  # Ancho del panel lateral
+            alignment=ft.alignment.top_right,  # Asegura que se alinee a la derecha
+            border_radius=ft.border_radius.only(top_left=20, bottom_left=20),
+            margin=ft.margin.only(top=60, right=20)  # Ajuste para que quede bajo el header y a la derecha
         )
 
+        # Mantener compatibilidad con el atributo popup
+        self.popup = self  # Referencia a sí mismo para mantener compatibilidad
+
+        self.page.controls.append(self.container)  # Agrega el contenedor al layout principal
+
+    def show_notifications(self):
+        """Actualiza y muestra el popup con las notificaciones actuales."""
+        if not self.notifications:
+            self.notifications.append("No tienes notificaciones nuevas.")
+        else:
+            self.notifications = [n for n in self.notifications if n != "No tienes notificaciones nuevas."]
+
+        self.container.content.controls[2].controls = [
+            ft.Text(notification, color=self.text_color) for notification in self.notifications
+        ]
+        self.container.visible = True
+        self.container.update()
+        self.page.update()
+    
+    def add_notification(self, message: str):
+        """Agrega una nueva notificación a la lista."""
+        self.notifications.append(message)
+    
     def update_notifications(self, notifications: list):
         """Actualiza el contenido del popup con una lista de notificaciones."""
         self.container.content.controls[1].controls = [
@@ -37,28 +77,6 @@ class NotificationsPopup:
     def close_popup(self, e=None):
         """Cierra el popup."""
         self.container.visible = False
-        self.container.update()  # Actualiza el contenedor
-        self.page.update()  # Actualiza la página
-
-
-class NotificationsManager:
-    def __init__(self, page: ft.Page, header_color: str, text_color: str):
-        self.page = page
-        self.popup = NotificationsPopup(page, header_color, text_color)  # Pasar 'page' al popup
-        self.notifications = []
-        self.page.controls.append(self.popup.container)  # Agrega el contenedor al layout principal
-
-    def add_notification(self, message: str):
-        """Agrega una nueva notificación a la lista."""
-        self.notifications.append(message)
-
-    def show_notifications(self):
-        """Actualiza y muestra el popup con las notificaciones actuales."""
-        if not self.notifications:
-            self.notifications.append("No tienes notificaciones nuevas.")
-        else:
-            self.notifications = [n for n in self.notifications if n != "No tienes notificaciones nuevas."]
-
-        self.popup.update_notifications(self.notifications)
-        self.page.update()  # Actualiza la página para reflejar los cambios
+        self.container.update()
+        self.page.update()
 
