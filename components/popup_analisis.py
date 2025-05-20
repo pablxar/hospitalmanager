@@ -5,6 +5,7 @@ from scripts.analisis_economico import AnalisisEconomico
 from scripts.analisis_clinico_gestion import AnalisisClinicoGestion
 from scripts.analisis_cohortes import AnalisisCohortes
 import os
+from zipfile import ZipFile
 
 def crear_popup_analisis(page: ft.Page):
     progress_bar = ft.ProgressBar(width=400, value=0, visible=False)
@@ -68,6 +69,8 @@ def crear_popup_analisis(page: ft.Page):
             AnalisisCohortes(page, carpeta_salida).ejecutar_analisis(df, update_progress)
             progress_bar.visible = False
             progress_text.visible = False
+            download_btn.on_click = lambda e: descargar_resultados(e, carpeta_salida, nombre_carpeta)
+            download_btn.visible = True
             popup.update()
             page.snack_bar = ft.SnackBar(ft.Text("Análisis finalizado correctamente."))
             page.snack_bar.open = True
@@ -78,20 +81,50 @@ def crear_popup_analisis(page: ft.Page):
             error_text.visible = True
             popup.update()
 
-    file_picker = ft.FilePicker(on_result=ejecutacion)
+    def crear_zip(carpeta_salida):
+        zip_path = f"{carpeta_salida}.zip"
+        with ZipFile(zip_path, 'w') as zipf:
+            for root, _, files in os.walk(carpeta_salida):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, carpeta_salida)
+                    zipf.write(file_path, arcname)
+        return zip_path
+
+    def descargar_resultados(e, carpeta_salida, nombre_carpeta):
+        zip_path = crear_zip(carpeta_salida)
+        file_picker.save_file(file_name=f"{nombre_carpeta}.zip")
+        file_picker.on_save = lambda e: guardar_zip(e, zip_path)
+
+    def guardar_zip(e, zip_path):
+        if e.path:
+            os.rename(zip_path, e.path)
+
+    file_picker = ft.FilePicker()
     page.overlay.append(file_picker)
 
+    file_picker.on_result = ejecutacion
+    file_picker.on_save = lambda e: guardar_zip(e, None)  # Inicialización segura para evitar errores
+
     upload_btn = ft.ElevatedButton("Subir Base de Datos", on_click=lambda e: file_picker.pick_files())
+
+    close_btn = ft.IconButton(icon=ft.Icons.CLOSE, on_click=lambda e: [setattr(popup, 'open', False), popup.update()])
+
+    download_btn = ft.ElevatedButton("Descargar Resultados", visible=False)
 
     popup = ft.AlertDialog(
         modal=True,
         open=False,  # No abrir automáticamente
         content=ft.Column([
-            ft.Text("Análisis de Base de Datos", size=20, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+            ft.Row([
+                ft.Text("Análisis de Base de Datos", size=20, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                close_btn
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             upload_btn,
             progress_bar,
             progress_text,
-            error_text
+            error_text,
+            download_btn
         ],
         alignment=ft.MainAxisAlignment.CENTER,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,

@@ -42,7 +42,7 @@ class MainApp(ft.Container):
         }
 
         # Agregar el contenedor de notificaciones al layout principal
-        self.page.overlay.append(self.notifications_manager.popup.container)
+        self.page.overlay.append(self.notifications_manager.container)
 
         self.setup_sidebar_events()
 
@@ -61,10 +61,10 @@ class MainApp(ft.Container):
         )
 
         # Ejemplo de botón que genera una notificación automática
-        self.test_button = ft.ElevatedButton(
-            text="Generar Notificación",
-            on_click=lambda e: self.add_notification("Se ejecutó el botón de prueba")
-        )
+        # self.test_button = ft.ElevatedButton(
+        #     text="Generar Notificación",
+        #     on_click=lambda e: self.add_notification("Se ejecutó el botón de prueba")
+        # )
 
         # Agregar el botón al diseño principal
         self.page.add(ft.Column(
@@ -72,7 +72,7 @@ class MainApp(ft.Container):
             controls = [
                 self.header,
                 self.body,
-                self.test_button  # Botón de prueba agregado
+                # self.test_button  # Botón de prueba agregado
             ]
         ))
 

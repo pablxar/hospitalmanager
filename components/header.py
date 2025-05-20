@@ -39,7 +39,7 @@ class Header(ft.Container):
                             icon_color=notify_color,
                             tooltip="Notificaciones",
                             icon_size=30,
-                            on_click=lambda e: self.notifications_manager.show_notifications()
+                            #on_click=lambda e: self.notifications_manager.show_notifications()
                         ),
                         ft.IconButton(
                             icon=ft.Icons.PERSON,
