@@ -1,5 +1,6 @@
 import flet as ft
 from components.notifications import NotificationsManager
+from components.popup_analisis import crear_popup_analisis
 
 class HomeView(ft.Container):
     def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager):
@@ -12,6 +13,9 @@ class HomeView(ft.Container):
         self.text_color2 = text_color2
         self.page.bgcolor = bg_color
         self.notifications_manager = notifications_manager
+
+        self.popup, self.file_picker = crear_popup_analisis(self.page)
+        self.page.dialog = self.popup
 
         self.content = ft.Column(
             scroll=ft.ScrollMode.AUTO,
@@ -76,9 +80,19 @@ class HomeView(ft.Container):
                 on_click=on_click
             )
         )
-
     def on_new_analysis_click(self, e):
-        self.notifications_manager.add_notification("Nuevo análisis iniciado")
+        # Asegúrate de que el popup esté configurado correctamente
+        if not self.popup:
+            self.popup, self.file_picker = crear_popup_analisis(self.page)
+            self.popup.alignment = ft.alignment.center  # Centrar el popup
+
+        # Agregar el popup al overlay si no está presente
+        if self.popup not in self.page.overlay:
+            self.page.overlay.append(self.popup)
+
+        # Mostrar el popup sobre la vista actual
+        self.popup.open = True
+        self.page.update()
 
     def create_graph_section(self):
         return ft.Container(

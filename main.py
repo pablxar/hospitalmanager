@@ -102,4 +102,4 @@ class MainApp(ft.Container):
         self.notifications_manager.add_notification(message)
         
 
-ft.app(target=MainApp, view=ft.WEB_BROWSER, assets_dir="assets")
+ft.app(target=MainApp)

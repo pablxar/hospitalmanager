@@ -8,6 +8,7 @@ class NotificationsManager:
         self.text_color = text_color
         self.notify_color = notify_color
         self.notifications = []
+        self.popup = self 
 
         # Crear el contenedor de notificaciones
         self.container = ft.Container(
@@ -37,13 +38,10 @@ class NotificationsManager:
             bgcolor=notify_color,
             padding=20,
             width=300,  # Ancho del panel lateral
-            alignment=ft.alignment.top_right,  # Asegura que se alinee a la derecha
+            alignment=ft.alignment.center_right,  # Asegura que se alinee al borde derecho de toda la pantalla
             border_radius=ft.border_radius.only(top_left=20, bottom_left=20),
-            margin=ft.margin.only(top=60, right=20)  # Ajuste para que quede bajo el header y a la derecha
+            margin=ft.margin.only(top=0, right=0)  # Elimina márgenes para que quede al borde
         )
-
-        # Mantener compatibilidad con el atributo popup
-        self.popup = self  # Referencia a sí mismo para mantener compatibilidad
 
         self.page.controls.append(self.container)  # Agrega el contenedor al layout principal
 
@@ -79,4 +77,3 @@ class NotificationsManager:
         self.container.visible = False
         self.container.update()
         self.page.update()
-
