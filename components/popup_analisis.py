@@ -2,6 +2,8 @@ import flet as ft
 import pandas as pd
 import io
 from zipfile import ZipFile
+from datetime import datetime
+from database import DatabaseManager
 
 from scripts.analisis_exploratorio import AnalisisExploratorio
 from scripts.analisis_economico import AnalisisEconomico
@@ -120,20 +122,39 @@ def crear_popup_analisis(page: ft.Page):
             error_text.visible = True
             popup.update()
 
+    # Inicializar la base de datos
+    db_manager = DatabaseManager()
+
     def guardar_zip(event):
         nonlocal zip_buffer
         if zip_buffer and event.path:
             try:
                 with open(event.path, "wb") as f:
                     f.write(zip_buffer.getbuffer())
-                    snackbar = ft.SnackBar(
-                        content=ft.Text("Análisis guardado correctamente", color=ft.Colors.WHITE),
-                        bgcolor="#4CAF50",  # Color verde para éxito
-                        behavior=ft.SnackBarBehavior.FLOATING,
-                    )
-                    page.overlay.append(snackbar)
-                    snackbar.open = True
-                    page.update()
+
+                # Generar nombre del análisis basado en la fecha y hora
+                now = datetime.now()
+                analysis_name = f"Analisis_{now.strftime('%Y-%m-%d_%H-%M-%S')}"
+
+                # Leer el contenido del archivo .zip para guardarlo en la base de datos
+                zip_buffer.seek(0)  # Asegurarse de que el puntero esté al inicio
+                zip_content = zip_buffer.read()
+
+                # Guardar en la base de datos
+                db_manager.insert_analysis(
+                    name=analysis_name,
+                    date=now.strftime('%Y-%m-%d %H:%M:%S'),
+                    file_content=zip_content  # Guardar el contenido del archivo .zip
+                )
+
+                snackbar = ft.SnackBar(
+                    content=ft.Text("Análisis guardado correctamente", color=ft.Colors.WHITE),
+                    bgcolor="#4CAF50",  # Color verde para éxito
+                    behavior=ft.SnackBarBehavior.FLOATING,
+                )
+                page.overlay.append(snackbar)
+                snackbar.open = True
+                page.update()
             except Exception as ex:
                 snackbar = ft.SnackBar(
                     content=ft.Text(f"Error al guardar el archivo: {ex}", color=ft.Colors.WHITE),
