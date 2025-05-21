@@ -1,88 +1,72 @@
-import flet as ft
 import pandas as pd
-import os
-import dataframe_image as dfi
+import io
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 class AnalisisClinicoGestion:
-    def __init__(self, page: ft.Page, carpeta_salida: str):
+    def __init__(self, page, nombre_archivo=None):
         self.page = page
-        self.carpeta_salida = carpeta_salida
-        self.asegurar_directorios()
-
-    def asegurar_directorios(self):
-        os.makedirs(f"{self.carpeta_salida}/graficos/graficos_gestion", exist_ok=True)
-        os.makedirs(f"{self.carpeta_salida}/tablas/tablas_gestion", exist_ok=True)
-
-    def exportar_tabla_imagen(self, df: pd.DataFrame, filename: str):
-        path = f"{self.carpeta_salida}/tablas/tablas_gestion/{filename}.png"
-        dfi.export(df, path, max_rows=-1, table_conversion="chrome")
-        self.page.snack_bar = ft.SnackBar(ft.Text(f"Tabla exportada como imagen: {path}"))
-        self.page.snack_bar.open = True
-        self.page.update()
+        self.nombre_archivo = nombre_archivo
 
     def generar_tablas(self, df: pd.DataFrame):
-        # Tiempo promedio de estadía según diagnóstico
+        tablas = {}
+
         if 'Estancia del episodio' in df.columns and 'DG01 principal (descripcion)' in df.columns:
-            tabla_estancia = df.groupby('DG01 principal (descripcion)', observed=False)['Estancia del episodio'].mean().sort_values(ascending=False).reset_index()
-            self.exportar_tabla_imagen(tabla_estancia, "estancia_promedio_por_diagnostico")
+            tablas['estancia_promedio_por_diagnostico'] = df.groupby('DG01 principal (descripcion)', observed=False)['Estancia del episodio'].mean().sort_values(ascending=False).reset_index()
 
-        # Diagnósticos que generan mayores costos
         if 'Valor a Pagar' in df.columns and 'DG01 principal (descripcion)' in df.columns:
-            tabla_costos = df.groupby('DG01 principal (descripcion)', observed=False)['Valor a Pagar'].mean().sort_values(ascending=False).reset_index()
-            self.exportar_tabla_imagen(tabla_costos, "costos_promedio_por_diagnostico")
+            tablas['costos_promedio_por_diagnostico'] = df.groupby('DG01 principal (descripcion)', observed=False)['Valor a Pagar'].mean().sort_values(ascending=False).reset_index()
 
-        # Estadía media por tipo de actividad
         if 'Tipo Actividad' in df.columns and 'Estancia del episodio' in df.columns:
-            tabla_estancia_tipo = df.groupby('Tipo Actividad', observed=False)['Estancia del episodio'].mean().sort_values(ascending=False).reset_index()
-            self.exportar_tabla_imagen(tabla_estancia_tipo, "estancia_promedio_por_tipo_actividad")
+            tablas['estancia_promedio_por_tipo_actividad'] = df.groupby('Tipo Actividad', observed=False)['Estancia del episodio'].mean().sort_values(ascending=False).reset_index()
 
-        # Diagnósticos más frecuentes por grupo etario (0–18, 19–59, 60+)
         if 'Edad en Años' in df.columns and 'DG01 principal (descripcion)' in df.columns:
             df['Grupo Etario'] = pd.cut(df['Edad en Años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
-            tabla_frecuencia_etaria = df.groupby(['Grupo Etario', 'DG01 principal (descripcion)'], observed=False).size().unstack(fill_value=0)
-            self.exportar_tabla_imagen(tabla_frecuencia_etaria, "frecuencia_diagnosticos_por_edad")
+            tablas['frecuencia_diagnosticos_por_edad'] = df.groupby(['Grupo Etario', 'DG01 principal (descripcion)'], observed=False).size().unstack(fill_value=0)
+
+        return tablas
 
     def generar_graficos(self, df: pd.DataFrame):
-        # Boxplot de Valor a Pagar por previsión
+        graficos = {}
+
         if 'Valor a Pagar' in df.columns and 'Previsión' in df.columns:
-            plt.figure()
-            df.boxplot(column='Valor a Pagar', by='Previsión', grid=False)
-            plt.title('Distribución del Valor a Pagar por Previsión')
-            plt.suptitle('')  # Eliminar el título automático de pandas
-            plt.xlabel('Previsión')
-            plt.ylabel('Valor a Pagar')
-            plt.savefig(f"{self.carpeta_salida}/graficos/graficos_gestion/boxplot_valor_por_prevision.jpg")
-            plt.close()
+            fig, ax = plt.subplots()
+            df.boxplot(column='Valor a Pagar', by='Previsión', grid=False, ax=ax)
+            ax.set_title('Distribución del Valor a Pagar por Previsión')
+            ax.set_xlabel('Previsión')
+            ax.set_ylabel('Valor a Pagar')
+            plt.suptitle('')
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            graficos['boxplot_valor_por_prevision.png'] = buf.getvalue()
 
-        # Correlación entre Peso GRD y Valor a Pagar
         if 'Peso GRD medio' in df.columns and 'Valor a Pagar' in df.columns:
-            plt.figure()
-            plt.scatter(df['Peso GRD medio'], df['Valor a Pagar'])
-            plt.title('Relación entre Peso GRD medio y Valor a Pagar')
-            plt.xlabel('Peso GRD medio')
-            plt.ylabel('Valor a Pagar')
-            plt.savefig(f"{self.carpeta_salida}/graficos/graficos_gestion/scatter_peso_vs_valor.jpg")
-            plt.close()
+            fig, ax = plt.subplots()
+            ax.scatter(df['Peso GRD medio'], df['Valor a Pagar'])
+            ax.set_title('Relación entre Peso GRD medio y Valor a Pagar')
+            ax.set_xlabel('Peso GRD medio')
+            ax.set_ylabel('Valor a Pagar')
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            graficos['scatter_peso_vs_valor.png'] = buf.getvalue()
 
-        self.page.snack_bar = ft.SnackBar(ft.Text("Gráficos generados y guardados correctamente."))
-        self.page.snack_bar.open = True
-        self.page.update()
+        return graficos
+
+    def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
+        resultados = {}
+        resultados['tablas'] = self.generar_tablas(df)
+        if update_progress:
+            update_progress()
+        resultados['graficos'] = self.generar_graficos(df)
+        if update_progress:
+            update_progress()
+        return resultados
 
     @staticmethod
     def get_total_steps():
-        # Define the number of graphs and tables generated by this analysis
-        return 7  # Example: 2 graphs + 5 tables
-
-    def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
-        self.exportar_tabla_imagen(df, "tabla_general_gestión")
-        if update_progress:
-            update_progress()
-        self.generar_tablas(df)
-        if update_progress:
-            update_progress()
-        self.generar_graficos(df)
-        if update_progress:
-            update_progress()
+        return 6

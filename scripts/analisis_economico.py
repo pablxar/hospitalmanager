@@ -1,81 +1,75 @@
-import flet as ft
 import pandas as pd
-import os
-import dataframe_image as dfi
+import io
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 class AnalisisEconomico:
-    def __init__(self, page: ft.Page, carpeta_salida: str):
+    def __init__(self, page, nombre_archivo=None):
         self.page = page
-        self.carpeta_salida = carpeta_salida
-        self.asegurar_directorios()
-
-    def asegurar_directorios(self):
-        os.makedirs(f"{self.carpeta_salida}/graficos/graficos_economicos", exist_ok=True)
-        os.makedirs(f"{self.carpeta_salida}/tablas/tablas_economicos", exist_ok=True)
-
-    def exportar_tabla_imagen(self, df: pd.DataFrame, filename: str):
-        path = f"{self.carpeta_salida}/tablas/tablas_economicos/{filename}.png"
-        dfi.export(df, path, max_rows=-1, table_conversion="chrome")
-        self.page.snack_bar = ft.SnackBar(ft.Text(f"Tabla exportada como imagen: {path}"))
-        self.page.snack_bar.open = True
-        self.page.update()
+        self.nombre_archivo = nombre_archivo
 
     def generar_tablas(self, df: pd.DataFrame):
+        tablas = {}
+
         # Comparación entre Precio Base y Valor a Pagar (promedio)
         if 'Valor Precio Base' in df.columns and 'Valor a Pagar' in df.columns:
-            tabla_comparacion = df[['Valor Precio Base', 'Valor a Pagar']].describe().loc[['mean', 'std', 'min', 'max']]
-            self.exportar_tabla_imagen(tabla_comparacion, "comparacion_valores")
+            tablas['comparacion_valores'] = df[['Valor Precio Base', 'Valor a Pagar']].describe().loc[['mean', 'std', 'min', 'max']]
 
         # Diagnósticos con mayor desviación entre base y valor real
         if 'DG01 principal (descripcion)' in df.columns:
             df['Desviacion'] = df['Valor a Pagar'] - df['Valor Precio Base']
-            tabla_desviacion = df.groupby('DG01 principal (descripcion)')['Desviacion'].mean().sort_values(ascending=False).reset_index()
-            self.exportar_tabla_imagen(tabla_desviacion, "desviacion_promedio_por_diagnostico")
+            tablas['desviacion_promedio_por_diagnostico'] = df.groupby('DG01 principal (descripcion)')['Desviacion'].mean().sort_values(ascending=False).reset_index()
 
         # Promedio de costo por día de estancia
         if 'Valor a Pagar' in df.columns and 'Estancia del episodio' in df.columns:
             df['Costo por Día'] = df['Valor a Pagar'] / df['Estancia del episodio'].replace(0, 1)
-            tabla_costos_dia = df.groupby('Tipo Actividad')['Costo por Día'].mean().sort_values(ascending=False).reset_index()
-            self.exportar_tabla_imagen(tabla_costos_dia, "costo_promedio_por_dia")
+            tablas['costo_promedio_por_dia'] = df.groupby('Tipo Actividad')['Costo por Día'].mean().sort_values(ascending=False).reset_index()
+
+        return tablas
 
     def generar_graficos(self, df: pd.DataFrame):
+        graficos = {}
+
         # Comparar Valor a Pagar vs Valor Precio Base
         if 'Valor a Pagar' in df.columns and 'Valor Precio Base' in df.columns:
-            plt.figure()
-            plt.scatter(df['Valor Precio Base'], df['Valor a Pagar'])
-            plt.title('Valor a Pagar vs Precio Base')
-            plt.xlabel('Valor Precio Base')
-            plt.ylabel('Valor a Pagar')
-            plt.savefig(f"{self.carpeta_salida}/graficos/graficos_economicos/scatter_valores.jpg")
-            plt.close()
+            fig, ax = plt.subplots()
+            ax.scatter(df['Valor Precio Base'], df['Valor a Pagar'])
+            ax.set_title('Valor a Pagar vs Precio Base')
+            ax.set_xlabel('Valor Precio Base')
+            ax.set_ylabel('Valor a Pagar')
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            graficos['scatter_valores.png'] = buf.getvalue()
 
         # Costo por día vs tipo de actividad
         if 'Costo por Día' in df.columns and 'Tipo Actividad' in df.columns:
-            plt.figure()
-            df.boxplot(column='Costo por Día', by='Tipo Actividad', grid=False)
-            plt.title('Costo por Día según Tipo de Actividad')
-            plt.suptitle('')  # Eliminar el título automático de pandas
-            plt.xlabel('Tipo de Actividad')
-            plt.ylabel('Costo por Día')
-            plt.savefig(f"{self.carpeta_salida}/graficos/graficos_economicos/boxplot_costo_por_dia.jpg")
-            plt.close()
+            fig, ax = plt.subplots()
+            df.boxplot(column='Costo por Día', by='Tipo Actividad', grid=False, ax=ax)
+            ax.set_title('Costo por Día según Tipo de Actividad')
+            ax.set_xlabel('Tipo de Actividad')
+            ax.set_ylabel('Costo por Día')
+            plt.suptitle('')  # Quita título automático
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            graficos['boxplot_costo_por_dia.png'] = buf.getvalue()
 
-        self.page.snack_bar = ft.SnackBar(ft.Text("Gráficos generados y guardados correctamente."))
-        self.page.snack_bar.open = True
-        self.page.update()
+        return graficos
+
+    def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
+        resultados = {}
+        resultados['tablas'] = self.generar_tablas(df)
+        if update_progress:
+            update_progress()
+        resultados['graficos'] = self.generar_graficos(df)
+        if update_progress:
+            update_progress()
+        return resultados
 
     @staticmethod
     def get_total_steps():
-        # Define the number of graphs and tables generated by this analysis
-        return 5  # Example: 2 graphs + 3 tables
-
-    def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
-        self.generar_tablas(df)
-        if update_progress:
-            update_progress()
-        self.generar_graficos(df)
-        if update_progress:
-            update_progress()
+        return 5

@@ -1,84 +1,82 @@
-import flet as ft
 import pandas as pd
-import os
-import dataframe_image as dfi
+import io
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 class AnalisisCohortes:
-    def __init__(self, page: ft.Page, carpeta_salida: str):
+    def __init__(self, page, nombre_archivo=None):
         self.page = page
-        self.carpeta_salida = carpeta_salida
-        self.asegurar_directorios()
+        self.nombre_archivo = nombre_archivo
 
-    def asegurar_directorios(self):
-        os.makedirs(f"{self.carpeta_salida}/graficos/graficos_cohortes", exist_ok=True)
-        os.makedirs(f"{self.carpeta_salida}/tablas/tablas_cohortes", exist_ok=True)
-
-    def exportar_tabla_imagen(self, df: pd.DataFrame, filename: str):
-        path = f"{self.carpeta_salida}/tablas/tablas_cohortes/{filename}.png"
-        dfi.export(df, path, max_rows=-1, table_conversion="chrome")
-        self.page.snack_bar = ft.SnackBar(ft.Text(f"Tabla exportada como imagen: {path}"))
-        self.page.snack_bar.open = True
-        self.page.update()
+    def exportar_tabla_imagen_bytes(self, df: pd.DataFrame):
+        import dataframe_image as dfi  # Mantener si lo usas, aunque en zip guardamos csv preferentemente
+        buffer = io.BytesIO()
+        dfi.export(df, buffer, max_rows=-1, table_conversion="chrome")
+        buffer.seek(0)
+        return buffer.getvalue()
 
     def generar_tablas(self, df: pd.DataFrame):
-        # Diagnósticos más frecuentes por grupo etario
+        resultados = {}
+
         if 'Edad en Años' in df.columns and 'DG01 principal (descripcion)' in df.columns:
             df['Grupo Etario'] = pd.cut(df['Edad en Años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
             tabla_diagnosticos = df.groupby(['Grupo Etario', 'DG01 principal (descripcion)'], observed=False).size().unstack(fill_value=0)
-            self.exportar_tabla_imagen(tabla_diagnosticos, "diagnosticos_por_grupo_etario")
+            resultados['diagnosticos_por_grupo_etario'] = tabla_diagnosticos
 
-        # Ingresos promedio por mes
         if 'Fecha Ingreso' in df.columns and 'Valor a Pagar' in df.columns:
             df['Fecha Ingreso'] = pd.to_datetime(df['Fecha Ingreso'], errors='coerce')
-            df = df.dropna(subset=['Fecha Ingreso'])  # Eliminar filas con fechas no válidas
+            df = df.dropna(subset=['Fecha Ingreso'])
             df['Mes de Ingreso'] = df['Fecha Ingreso'].dt.to_period('M')
             tabla_ingresos = df.groupby('Mes de Ingreso', observed=False)['Valor a Pagar'].mean().reset_index()
-            self.exportar_tabla_imagen(tabla_ingresos, "ingresos_por_mes")
+            resultados['ingresos_por_mes'] = tabla_ingresos
+
+        return resultados
 
     def generar_graficos(self, df: pd.DataFrame):
-        # Heatmap de diagnósticos por grupo etario
+        resultados = {}
+
         if 'Edad en Años' in df.columns and 'DG01 principal (descripcion)' in df.columns:
             df['Grupo Etario'] = pd.cut(df['Edad en Años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
             heatmap_data = df.pivot_table(index='Grupo Etario', columns='DG01 principal (descripcion)', aggfunc='size', fill_value=0)
             plt.figure(figsize=(10, 8))
             sns.heatmap(heatmap_data, annot=False, cmap="YlGnBu")
             plt.title('Heatmap de Diagnósticos por Grupo Etario')
-            plt.savefig(f"{self.carpeta_salida}/graficos/graficos_cohortes/heatmap_diagnosticos_etario.jpg")
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            buffer.seek(0)
+            resultados['heatmap_diagnosticos_etario.png'] = buffer.getvalue()
             plt.close()
 
-        # Línea de ingresos mensuales
         if 'Fecha Ingreso' in df.columns and 'Valor a Pagar' in df.columns:
             df['Fecha Ingreso'] = pd.to_datetime(df['Fecha Ingreso'], errors='coerce')
-            df = df.dropna(subset=['Fecha Ingreso'])  # Eliminar filas con fechas no válidas
+            df = df.dropna(subset=['Fecha Ingreso'])
             df['Mes de Ingreso'] = df['Fecha Ingreso'].dt.to_period('M')
 
-            # Generar gráfico de línea de ingresos mensuales
             ingresos_mensuales = df.groupby('Mes de Ingreso', observed=False)['Valor a Pagar'].sum()
             plt.figure()
             ingresos_mensuales.plot(kind='line')
             plt.title('Línea de Ingresos Mensuales')
             plt.xlabel('Mes de Ingreso')
             plt.ylabel('Ingresos Totales')
-            plt.savefig(f"{self.carpeta_salida}/graficos/graficos_cohortes/linea_ingresos_mensuales.jpg")
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            buffer.seek(0)
+            resultados['linea_ingresos_mensuales.png'] = buffer.getvalue()
             plt.close()
 
-        self.page.snack_bar = ft.SnackBar(ft.Text("Gráficos generados y guardados correctamente."))
-        self.page.snack_bar.open = True
-        self.page.update()
+        return resultados
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
-        self.generar_tablas(df)
+        tablas = self.generar_tablas(df)
         if update_progress:
             update_progress()
-        self.generar_graficos(df)
+        graficos = self.generar_graficos(df)
         if update_progress:
             update_progress()
+        return {"tablas": tablas, "graficos": graficos}
 
     @staticmethod
     def get_total_steps():
-        # Define the number of graphs and tables generated by this analysis
-        return 4  # Example: 2 graphs + 2 table
+        return 4
