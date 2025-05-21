@@ -2,7 +2,7 @@ import flet as ft
 from components.notifications import NotificationsManager
 
 class SettingsView(ft.Container):
-    def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager):
+    def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager, user):
         super().__init__(expand=True)
         self.page = page
         self.bg_color = bg_color
@@ -10,6 +10,7 @@ class SettingsView(ft.Container):
         self.white_color = white_color
         self.notify_color = notify_color
         self.text_color2 = text_color2
+        self.user = user  # Información del usuario logueado
         self.notifications_manager = notifications_manager  # Almacena el NotificationsManager para usarlo
 
         # Widget de configuración

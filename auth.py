@@ -24,3 +24,4 @@ class AuthManager:
         if user[2] == hash_password(password):  # password_hash está en posición 2
             return user  # retorna toda la fila, por ej. (id, username, password_hash, ...)
         return None
+    

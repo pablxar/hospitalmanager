@@ -14,6 +14,7 @@ class MainApp(ft.Container):
     def __init__(self, page: ft.Page):
         super().__init__(expand=True)
         self.page = page
+        self.page.icon = "assets/logo.ico"  # Cambiar el icono de la ventana al iniciar el programa
         self.db_manager = DatabaseManager()
         self.auth_manager = AuthManager(self.db_manager)
 
@@ -47,9 +48,14 @@ class MainApp(ft.Container):
         self.show_login()
 
     def show_login(self):
-        self.page.title = "Login - Manager Reports App"
+        self.page.title = "Logeo - Manager Reports App"
+        self.page.icon = "assets/logo.ico"  # Cambiar el icono de la ventana
         self.page.controls.clear()
+
+        # Instanciar la vista de login
         self.login_view = LoginView(self.page, self.auth_manager, self.on_login_success)
+
+        # Agregar la vista de login a la página
         self.page.add(self.login_view)
         self.page.update()
 
@@ -66,8 +72,8 @@ class MainApp(ft.Container):
         self.views = {
             "home": HomeView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
             "reports": ReportsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
-            "settings": SettingsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager),
-            "account": AccountView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager),
+            "settings": SettingsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
+            "account": AccountView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user, self.auth_manager, self.on_login_success),
         }
 
         self.page.overlay.append(self.notifications_manager.container)
