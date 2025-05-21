@@ -4,7 +4,7 @@ from database import DatabaseManager
 import os
 
 class ReportsView(ft.Container):
-    def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager):
+    def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager, user):
         super().__init__(expand=True)
         self.page = page
         self.bg_color = bg_color
@@ -14,6 +14,7 @@ class ReportsView(ft.Container):
         self.text_color2 = text_color2
         self.page.bgcolor = bg_color
         self.notifications_manager = notifications_manager
+        self.user = user
 
         # Inicializar la base de datos
         self.db_manager = DatabaseManager()
@@ -46,13 +47,13 @@ class ReportsView(ft.Container):
         )
 
     def create_report_list(self):
-        # Obtener análisis desde la base de datos (id, nombre, fecha, contenido blob)
-        analyses = self.db_manager.fetch_analyses()
+        # Obtener análisis desde la base de datos para el usuario logueado
+        analyses = self.db_manager.fetch_analyses_by_user(self.user[0])  # usuario_id en posición 0
         return ft.ListView(
             expand=True,
             spacing=10,
             controls=[
-                self.create_report_item(analysis[1], analysis[2], analysis[3]) for analysis in analyses
+                self.create_report_item(analysis[1], analysis[2], analysis[0]) for analysis in analyses
             ]
         )
 

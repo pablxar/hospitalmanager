@@ -26,7 +26,7 @@ def crear_zip_en_memoria(resultados_dict):
     zip_buffer.seek(0)
     return zip_buffer
 
-def crear_popup_analisis(page: ft.Page):
+def crear_popup_analisis(page: ft.Page, user):
     progress_bar = ft.ProgressBar(width=400, value=0, visible=False)
     progress_text = ft.Text("0/0", size=16, visible=False)
     error_text = ft.Text("", color=ft.Colors.RED, visible=False)
@@ -142,6 +142,7 @@ def crear_popup_analisis(page: ft.Page):
 
                 # Guardar en la base de datos
                 db_manager.insert_analysis(
+                    usuario_id=user[0],  # Usar el usuario logueado
                     name=analysis_name,
                     date=now.strftime('%Y-%m-%d %H:%M:%S'),
                     file_content=zip_content  # Guardar el contenido del archivo .zip
