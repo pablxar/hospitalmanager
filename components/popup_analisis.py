@@ -12,15 +12,12 @@ def crear_zip_en_memoria(resultados_dict):
     zip_buffer = io.BytesIO()
     with ZipFile(zip_buffer, "w") as zip_file:
         for nombre_analisis, resultados in resultados_dict.items():
-            # Guardar tablas (diccionario de dataframes)
             tablas = resultados.get('tablas') or {}
-            # Compatibilidad: algunos análisis usan 'estadisticas' en vez de 'tablas'
             if 'estadisticas' in resultados and isinstance(resultados['estadisticas'], pd.DataFrame):
                 tablas = {'estadisticas': resultados['estadisticas']}
             for nombre_tabla, df in tablas.items():
                 csv_bytes = df.to_csv(index=False).encode('utf-8')
                 zip_file.writestr(f"{nombre_analisis}/tablas/{nombre_tabla}.csv", csv_bytes)
-            # Guardar gráficos (diccionario de bytes)
             graficos = resultados.get('graficos', {})
             for nombre_img, img_bytes in graficos.items():
                 zip_file.writestr(f"{nombre_analisis}/graficos/{nombre_img}", img_bytes)
@@ -34,9 +31,24 @@ def crear_popup_analisis(page: ft.Page):
     download_btn = ft.ElevatedButton("Descargar Resultados", visible=False)
 
     resultados = {}
-    current_step = 0  # Inicialización de current_step
-    total_steps = 0  # Inicialización de total_steps
-    zip_buffer = None  # Inicialización de zip_buffer
+    current_step = 0
+    total_steps = 0
+    zip_buffer = None
+
+    def resetear_estado():
+        nonlocal resultados, current_step, total_steps, zip_buffer
+        resultados = {}
+        current_step = 0
+        total_steps = 0
+        zip_buffer = None
+        progress_bar.value = 0
+        progress_bar.visible = False
+        progress_text.value = ""
+        progress_text.visible = False
+        error_text.value = ""
+        error_text.visible = False
+        download_btn.visible = False
+        upload_btn.visible = True
 
     def cargar_datos(path):
         if path.endswith('.xlsx'):
@@ -59,14 +71,14 @@ def crear_popup_analisis(page: ft.Page):
         return df
 
     def update_progress():
-        nonlocal current_step, total_steps  # Declaración de nonlocal para evitar errores
+        nonlocal current_step, total_steps
         current_step += 1
         progress_bar.value = current_step / total_steps
         progress_text.value = f"{current_step}/{total_steps}"
         popup.update()
 
     def ejecutar_analisis(e):
-        nonlocal resultados, current_step, total_steps  # Declaración de nonlocal para evitar errores
+        nonlocal resultados, current_step, total_steps
         if file_picker.result.files:
             archivo_datos = file_picker.result.files[0].path
             try:
@@ -109,24 +121,49 @@ def crear_popup_analisis(page: ft.Page):
             popup.update()
 
     def guardar_zip(event):
-        nonlocal zip_buffer  # Declaración de nonlocal para evitar errores
+        nonlocal zip_buffer
         if zip_buffer and event.path:
             try:
                 with open(event.path, "wb") as f:
                     f.write(zip_buffer.getbuffer())
-                page.snack_bar = ft.SnackBar(ft.Text("Archivo guardado exitosamente."))
+                    snackbar = ft.SnackBar(
+                        content=ft.Text("Análisis guardado correctamente", color=ft.Colors.WHITE),
+                        bgcolor="#4CAF50",  # Color verde para éxito
+                        behavior=ft.SnackBarBehavior.FLOATING,
+                    )
+                    page.overlay.append(snackbar)
+                    snackbar.open = True
+                    page.update()
             except Exception as ex:
-                page.snack_bar = ft.SnackBar(ft.Text(f"Error al guardar el archivo: {ex}"))
+                snackbar = ft.SnackBar(
+                    content=ft.Text(f"Error al guardar el archivo: {ex}", color=ft.Colors.WHITE),
+                    bgcolor="#F44336",  # Color rojo para error
+                    behavior=ft.SnackBarBehavior.FLOATING,
+                )
+                page.overlay.append(snackbar)
+                snackbar.open = True
+                page.update()
         else:
-            page.snack_bar = ft.SnackBar(ft.Text("No se seleccionó ninguna ruta para guardar el archivo."))
-        page.snack_bar.open = True
-        page.update()
+            snackbar = ft.SnackBar(
+                content=ft.Text("No se seleccionó ninguna ruta para guardar el archivo.", color=ft.Colors.WHITE),
+                bgcolor="#FFC107",  # Color amarillo para advertencia
+                behavior=ft.SnackBarBehavior.FLOATING,
+            )
+            page.overlay.append(snackbar)
+            snackbar.open = True
+            page.update()
+
 
     def descargar_resultados(e):
-        nonlocal zip_buffer  # Declaración de nonlocal para evitar errores
+        nonlocal zip_buffer
         zip_buffer = crear_zip_en_memoria(resultados)
         file_picker.on_result = guardar_zip
         file_picker.save_file(file_name="resultados.zip")
+        popup.update()
+
+    def cerrar_popup(e):
+        resetear_estado()
+        popup.open = False
         popup.update()
 
     file_picker = ft.FilePicker(on_result=ejecutar_analisis)
@@ -134,7 +171,7 @@ def crear_popup_analisis(page: ft.Page):
 
     upload_btn = ft.ElevatedButton("Subir Base de Datos", on_click=lambda e: file_picker.pick_files())
     download_btn.on_click = descargar_resultados
-    close_btn = ft.IconButton(icon=ft.Icons.CLOSE, on_click=lambda e: [setattr(popup, 'open', False), popup.update()])
+    close_btn = ft.IconButton(icon=ft.Icons.CLOSE, on_click=cerrar_popup)
 
     popup = ft.AlertDialog(
         modal=True,
