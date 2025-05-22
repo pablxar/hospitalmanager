@@ -8,6 +8,7 @@ def hash_password(password: str) -> str:
 class AuthManager:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
+        self.active_user = None
 
     def register(self, username: str, password: str, email: str = None) -> bool:
         if self.db.get_user(username):
@@ -22,6 +23,13 @@ class AuthManager:
         if not user:
             return None
         if user[2] == hash_password(password):  # password_hash está en posición 2
+            self.active_user = user
             return user  # retorna toda la fila, por ej. (id, username, password_hash, ...)
         return None
+    
+    def logout(self):
+        # Limpiar variables de sesión locales
+        self.active_user = None
+        # Aquí puedes agregar limpieza de archivos temporales si se usan
+        print("Sesión cerrada correctamente.")
     
