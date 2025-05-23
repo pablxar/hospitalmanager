@@ -1,10 +1,36 @@
+import os
+import sys
 import sqlite3
 
+def resource_path(relative_path):
+    """Obtiene la ruta absoluta, funciona tanto en desarrollo como en .exe empaquetado"""
+    try:
+        # PyInstaller crea esta variable temporal donde extrae los archivos
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+def get_connection():
+    db_path = resource_path("app_data.db")  # Ajusta el nombre si tu base se llama distinto
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
 class DatabaseManager:
-    def __init__(self, db_name="app_data.db"):
-        self.connection = sqlite3.connect(db_name)
-        self.connection.execute("PRAGMA foreign_keys = ON")
-        self.create_tables()
+    def __init__(self):
+        self.connection = get_connection()
+        # Verifica si las tablas ya existen antes de intentar crearlas
+        if not self.tables_exist():
+            self.create_tables()
+
+    def tables_exist(self):
+        """Verifica si las tablas ya existen en la base de datos."""
+        query = "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('usuarios', 'analyses');"
+        with self.connection:
+            result = self.connection.execute(query).fetchall()
+        return len(result) == 2  # Devuelve True si ambas tablas existen
 
     def create_tables(self):
         with self.connection:

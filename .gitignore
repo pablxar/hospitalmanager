@@ -11,3 +11,15 @@ __pycache__/
 .DS_Store
 .env
 .vscode/
+
+*.spec
+*.toc
+*.zip
+*.pkg
+*.pyz
+*.txt
+*.html
+*.exe
+generar_datos.py
+*.xlsx
+*.csv
