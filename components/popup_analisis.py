@@ -4,6 +4,8 @@ import io
 from zipfile import ZipFile
 from datetime import datetime
 from database import DatabaseManager
+import matplotlib.pyplot as plt
+from flet import ControlEvent as control_event
 
 from scripts.analisis_exploratorio import AnalisisExploratorio
 from scripts.analisis_economico import AnalisisEconomico
@@ -18,13 +20,57 @@ def crear_zip_en_memoria(resultados_dict):
             if 'estadisticas' in resultados and isinstance(resultados['estadisticas'], pd.DataFrame):
                 tablas = {'estadisticas': resultados['estadisticas']}
             for nombre_tabla, df in tablas.items():
-                csv_bytes = df.to_csv(index=False).encode('utf-8')
-                zip_file.writestr(f"{nombre_analisis}/tablas/{nombre_tabla}.csv", csv_bytes)
+                # Formatear valores numéricos a 4 decimales
+                df = df.applymap(lambda x: f"{x:.4f}" if isinstance(x, (int, float)) else x)
+
+                # Cálculo dinámico de tamaño y fuente
+                ncols = len(df.columns)
+                nrows = len(df)
+                fig_width = max(14, ncols * 1.2)      # 1.2 pulgadas por columna mínimo
+                fig_height = max(1, min(0.7 * nrows, 40))  # Altura proporcional con máximo
+
+                header_fontsize = 14
+                cell_fontsize = 12
+
+                fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+                ax.axis('off')
+
+                col_colors = ['#4CAF50'] * ncols
+
+                table = ax.table(
+                    cellText=df.values,
+                    colLabels=df.columns,
+                    loc='center',
+                    cellLoc='center',
+                    colColours=col_colors
+                )
+
+                for (row, col), cell in table.get_celld().items():
+                    cell.set_linewidth(0.5)
+                    if row == 0:
+                        cell.set_text_props(weight='bold', color='white', fontsize=header_fontsize)
+                        cell.set_facecolor('#4CAF50')
+                    else:
+                        cell.set_text_props(fontsize=cell_fontsize)
+                        cell.set_facecolor('#F5F5F5')
+
+                table.auto_set_font_size(False)
+                table.scale(1.5, 1.5)
+
+                plt.tight_layout()
+                img_buffer = io.BytesIO()
+                plt.savefig(img_buffer, format='png', bbox_inches='tight')
+                plt.close(fig)
+                img_buffer.seek(0)
+
+                zip_file.writestr(f"{nombre_analisis}/tablas/{nombre_tabla}.png", img_buffer.getvalue())
+
             graficos = resultados.get('graficos', {})
             for nombre_img, img_bytes in graficos.items():
                 zip_file.writestr(f"{nombre_analisis}/graficos/{nombre_img}", img_bytes)
     zip_buffer.seek(0)
     return zip_buffer
+
 
 def crear_popup_analisis(page: ft.Page, user):
     progress_bar = ft.ProgressBar(width=400, value=0, visible=False)
@@ -127,8 +173,10 @@ def crear_popup_analisis(page: ft.Page, user):
 
     def guardar_zip(event):
         nonlocal zip_buffer
+
         if zip_buffer and event.path:
             try:
+                # Guardar el archivo ZIP en la ruta seleccionada
                 with open(event.path, "wb") as f:
                     f.write(zip_buffer.getbuffer())
 
@@ -140,7 +188,7 @@ def crear_popup_analisis(page: ft.Page, user):
                 zip_buffer.seek(0)  # Asegurarse de que el puntero esté al inicio
                 zip_content = zip_buffer.read()
 
-                # Guardar en la base de datos
+                # Guardar en la base de datos en el hilo principal
                 db_manager.insert_analysis(
                     usuario_id=user[0],  # Usar el usuario logueado
                     name=analysis_name,
@@ -148,6 +196,7 @@ def crear_popup_analisis(page: ft.Page, user):
                     file_content=zip_content  # Guardar el contenido del archivo .zip
                 )
 
+                # Mostrar mensaje de éxito
                 snackbar = ft.SnackBar(
                     content=ft.Text("Análisis guardado correctamente", color=ft.Colors.WHITE),
                     bgcolor="#4CAF50",  # Color verde para éxito
@@ -157,6 +206,7 @@ def crear_popup_analisis(page: ft.Page, user):
                 snackbar.open = True
                 page.update()
             except Exception as ex:
+                # Manejar errores al guardar en la base de datos
                 snackbar = ft.SnackBar(
                     content=ft.Text(f"Error al guardar el archivo: {ex}", color=ft.Colors.WHITE),
                     bgcolor="#F44336",  # Color rojo para error
@@ -166,6 +216,7 @@ def crear_popup_analisis(page: ft.Page, user):
                 snackbar.open = True
                 page.update()
         else:
+            # Manejar caso en que no se seleccionó una ruta
             snackbar = ft.SnackBar(
                 content=ft.Text("No se seleccionó ninguna ruta para guardar el archivo.", color=ft.Colors.WHITE),
                 bgcolor="#FFC107",  # Color amarillo para advertencia
