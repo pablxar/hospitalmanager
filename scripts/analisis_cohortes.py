@@ -11,11 +11,25 @@ class AnalisisCohortes:
         self.nombre_archivo = nombre_archivo
 
     def generar_tablas(self, df: pd.DataFrame):
+        # Siempre extraer año y mes de la fecha de egreso
+        df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+        df = df.dropna(subset=['Fecha de egreso completa'])
+        df['Año'] = df['Fecha de egreso completa'].dt.year
+        df['Mes'] = df['Fecha de egreso completa'].dt.month
+        # Determinar el mes y año más reciente
+        max_fecha = df['Fecha de egreso completa'].max()
+        max_anio = max_fecha.year
+        max_mes = max_fecha.month
+        # Filtrar para que todos los años solo lleguen hasta el último mes disponible
+        df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)]
         resultados = {}
 
-        # Definir grupo etario según "Edad en años"
+        # Definir grupo etario según "Edad en años" con los nuevos rangos
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
-            df['Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
+            df['Grupo Etario'] = pd.cut(
+                df['Edad en años'],
+                bins=[-1, 1, 5, 15, 55, 65, float('inf')],
+                labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
             tabla_diagnosticos = df.groupby(['Grupo Etario', 'Diag 01 Principal (cod+des)'], observed=False).size().unstack(fill_value=0)
             resultados['diagnosticos_por_grupo_etario'] = tabla_diagnosticos
 
@@ -35,6 +49,18 @@ class AnalisisCohortes:
         return resultados
 
     def generar_graficos(self, df: pd.DataFrame):
+        # Siempre extraer año y mes de la fecha de egreso
+        df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+        df = df.dropna(subset=['Fecha de egreso completa'])
+        df['Año'] = df['Fecha de egreso completa'].dt.year
+        df['Mes'] = df['Fecha de egreso completa'].dt.month
+        # Determinar el año y mes más reciente
+        max_fecha = df['Fecha de egreso completa'].max()
+        max_anio = max_fecha.year
+        max_mes = max_fecha.month
+        # Filtrar solo los datos del año más reciente y su anterior, hasta el mes máximo
+        anios_comparar = [max_anio - 1, max_anio]
+        df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)]
         resultados = {}
 
         # Heatmap diagnósticos por grupo etario
@@ -50,22 +76,48 @@ class AnalisisCohortes:
             resultados['heatmap_diagnosticos_etario.png'] = buffer.getvalue()
             plt.close()
 
-        # Línea de egresos mensuales
+        # Línea comparativa de egresos mensuales por año
         if 'Fecha de egreso completa' in df.columns:
             df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
             df = df.dropna(subset=['Fecha de egreso completa'])
-            df['Mes de Egreso'] = df['Fecha de egreso completa'].dt.to_period('M')
-            egresos_mensuales = df.groupby('Mes de Egreso', observed=False).size()
-            plt.figure(figsize=(12, 6))
-            egresos_mensuales.plot(kind='line')
-            plt.title('Línea de Egresos Mensuales')
-            plt.xlabel('Mes de Egreso')
-            plt.ylabel('Cantidad de Egresos')
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png')
-            buffer.seek(0)
-            resultados['linea_egresos_mensuales.png'] = buffer.getvalue()
-            plt.close()
+            df['Año'] = df['Fecha de egreso completa'].dt.year
+            df['Mes'] = df['Fecha de egreso completa'].dt.month
+            egresos = df.groupby(['Año', 'Mes']).size().unstack(level=0, fill_value=0)
+            fig, ax = plt.subplots(figsize=(12, 6))
+            egresos.plot(ax=ax)
+            ax.set_title('Egresos Mensuales Comparativos por Año')
+            ax.set_xlabel('Mes')
+            ax.set_ylabel('Cantidad de Egresos')
+            ax.legend(title='Año')
+            ax.set_xticks(range(1, 13))
+            ax.set_xticklabels([
+                'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+            ])
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            resultados['linea_egresos_mensuales_comparativo.png'] = buf.getvalue()
+        
+        # Línea comparativa de egresos mensuales por año (solo año más reciente y anterior, hasta el mes máximo)
+        egresos = df_comp.groupby(['Mes', 'Año']).size().unstack(level=1, fill_value=0)
+        fig, ax = plt.subplots(figsize=(12, 6))
+        egresos.plot(ax=ax)
+        ax.set_title(f'Egresos Mensuales {max_anio-1} vs {max_anio} (hasta mes {max_mes})')
+        ax.set_xlabel('Mes')
+        ax.set_ylabel('Cantidad de Egresos')
+        ax.legend(title='Año')
+        ax.set_xticks(range(1, max_mes+1))
+        ax.set_xticklabels([
+            'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+            'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+        ][:max_mes])
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png')
+        plt.close(fig)
+        buf.seek(0)
+        resultados['linea_egresos_mensuales_comparativo.png'] = buf.getvalue()
 
         # Barras promedio estancia por grupo etario
         if 'Edad en años' in df.columns and 'Estancia del Episodio' in df.columns:
