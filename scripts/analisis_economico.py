@@ -12,51 +12,67 @@ class AnalisisEconomico:
     def generar_tablas(self, df: pd.DataFrame):
         tablas = {}
 
-        # Comparación entre Precio Base y Valor a Pagar (promedio)
-        if 'Valor Precio Base' in df.columns and 'Valor a Pagar' in df.columns:
-            tablas['comparacion_valores'] = df[['Valor Precio Base', 'Valor a Pagar']].describe().loc[['mean', 'std', 'min', 'max']]
+        # Conteo por "Especialidad (Descripción)"
+        if 'Especialidad (Descripción )' in df.columns:
+            conteo_esp = df['Especialidad (Descripción )'].value_counts().reset_index()
+            conteo_esp.columns = ['Especialidad', 'Frecuencia']
+            tablas['conteo_especialidad'] = conteo_esp
 
-        # Diagnósticos con mayor desviación entre base y valor real
-        if 'DG01 principal (descripcion)' in df.columns:
-            df['Desviacion'] = df['Valor a Pagar'] - df['Valor Precio Base']
-            tablas['desviacion_promedio_por_diagnostico'] = df.groupby('DG01 principal (descripcion)')['Desviacion'].mean().sort_values(ascending=False).reset_index()
+        # Distribución por "Nivel de severidad (Descripción)"
+        if 'Nivel de severidad (Descripción)' in df.columns:
+            distrib_severidad = df['Nivel de severidad (Descripción)'].value_counts().reset_index()
+            distrib_severidad.columns = ['Nivel de severidad', 'Frecuencia']
+            tablas['distribucion_nivel_severidad'] = distrib_severidad
 
-        # Promedio de costo por día de estancia
-        if 'Valor a Pagar' in df.columns and 'Estancia del episodio' in df.columns:
-            df['Costo por Día'] = df['Valor a Pagar'] / df['Estancia del episodio'].replace(0, 1)
-            tablas['costo_promedio_por_dia'] = df.groupby('Tipo Actividad')['Costo por Día'].mean().sort_values(ascending=False).reset_index()
+        # Promedio de estancia por nivel de severidad
+        if 'Nivel de severidad (Descripción)' in df.columns and 'Estancia del Episodio' in df.columns:
+            promedio_estancia = df.groupby('Nivel de severidad (Descripción)')['Estancia del Episodio'].mean().reset_index()
+            tablas['promedio_estancia_por_severidad'] = promedio_estancia
 
         return tablas
 
     def generar_graficos(self, df: pd.DataFrame):
         graficos = {}
 
-        # Comparar Valor a Pagar vs Valor Precio Base
-        if 'Valor a Pagar' in df.columns and 'Valor Precio Base' in df.columns:
+        # Barras por Especialidad
+        if 'Especialidad (Descripción )' in df.columns:
             fig, ax = plt.subplots()
-            ax.scatter(df['Valor Precio Base'], df['Valor a Pagar'])
-            ax.set_title('Valor a Pagar vs Precio Base')
-            ax.set_xlabel('Valor Precio Base')
-            ax.set_ylabel('Valor a Pagar')
+            df['Especialidad (Descripción )'].value_counts().plot(kind='bar', ax=ax)
+            ax.set_title('Frecuencia por Especialidad')
+            ax.set_xlabel('Especialidad')
+            ax.set_ylabel('Frecuencia')
             buf = io.BytesIO()
             fig.savefig(buf, format='png')
             plt.close(fig)
             buf.seek(0)
-            graficos['scatter_valores.png'] = buf.getvalue()
+            graficos['barras_especialidad.png'] = buf.getvalue()
 
-        # Costo por día vs tipo de actividad
-        if 'Costo por Día' in df.columns and 'Tipo Actividad' in df.columns:
+        # Barras por Nivel de severidad
+        if 'Nivel de severidad (Descripción)' in df.columns:
             fig, ax = plt.subplots()
-            df.boxplot(column='Costo por Día', by='Tipo Actividad', grid=False, ax=ax)
-            ax.set_title('Costo por Día según Tipo de Actividad')
-            ax.set_xlabel('Tipo de Actividad')
-            ax.set_ylabel('Costo por Día')
-            plt.suptitle('')  # Quita título automático
+            df['Nivel de severidad (Descripción)'].value_counts().plot(kind='bar', color='orange', ax=ax)
+            ax.set_title('Distribución por Nivel de severidad')
+            ax.set_xlabel('Nivel de severidad')
+            ax.set_ylabel('Frecuencia')
             buf = io.BytesIO()
             fig.savefig(buf, format='png')
             plt.close(fig)
             buf.seek(0)
-            graficos['boxplot_costo_por_dia.png'] = buf.getvalue()
+            graficos['barras_nivel_severidad.png'] = buf.getvalue()
+
+        # Barras promedio estancia por severidad
+        if 'Nivel de severidad (Descripción)' in df.columns and 'Estancia del Episodio' in df.columns:
+            promedio_estancia = df.groupby('Nivel de severidad (Descripción)')['Estancia del Episodio'].mean()
+            fig, ax = plt.subplots()
+            promedio_estancia.plot(kind='bar', color='skyblue', ax=ax)
+            ax.set_title('Promedio de Estancia por Nivel de severidad')
+            ax.set_xlabel('Nivel de severidad')
+            ax.set_ylabel('Estancia Promedio')
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            graficos['promedio_estancia_severidad.png'] = buf.getvalue()
 
         return graficos
 
@@ -72,4 +88,4 @@ class AnalisisEconomico:
 
     @staticmethod
     def get_total_steps():
-        return 5
+        return 6

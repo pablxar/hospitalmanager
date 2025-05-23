@@ -100,23 +100,28 @@ def crear_popup_analisis(page: ft.Page, user):
 
     def cargar_datos(path):
         if path.endswith('.xlsx'):
-            return pd.read_excel(path)
+            # Saltar las 2 primeras filas y usar la fila 3 como header
+            return pd.read_excel(path, header=2)
         elif path.endswith('.csv'):
-            return pd.read_csv(path)
+            # Si csv no tiene esas filas, solo cargar normal
+            return pd.read_csv(path, header=2)
         else:
             raise ValueError("El archivo debe ser .xlsx o .csv")
 
+
     def verificar_columnas(df):
         columnas_requeridas = [
-            "Episodio CMBD", "Motivo Egreso (descripción)", "Tipo Actividad", "Previsión", "Fecha Ingreso",
-            "Fecha Egreso", "Hnp", "GRD codigo", "Peso GRD medio", "Estancia del episodio",
-            "Egreso", "DG01 principal (codigo)", "DG01 principal (descripcion)",
-            "Edad en Años", "Valor Precio Base", "Valor a Pagar"
+            "Año egreso", "Hospital (Descripción)", "GRD", "Especialidad (Descripción )", "Fecha de egreso completa",
+            "Sexo (Desc)", "Comuna de residencia ( Desc )", "Fecha ingreso completa", "(SI/NO) VMI", "Motivo Egreso (Descripción)",
+            "Prevision (Desc)", "Hospital de procedencia (Des )", "Estancia del Episodio", "(Sí/No) Cancer-Neoplasias",
+            "Tipo Ingreso (Descripción)", "Nivel de severidad (Descripción)", "(S/N) Egreso Quirúrgico", "(Si/No) Cesáreas", "Peso GRD",
+            "CDM (Descripción)", "Mes egreso (Descripción)", "Edad en años", "Diag 01 Principal (cod+des)", "Estancias [Norma]", "Egresos"
         ]
-        for col in columnas_requeridas:
-            if col not in df.columns:
-                raise ValueError(f"Falta la columna requerida: {col}")
+        columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
+        if columnas_faltantes:
+            raise ValueError(f"Faltan las columnas requeridas: {', '.join(columnas_faltantes)}")
         return df
+
 
     def update_progress():
         nonlocal current_step, total_steps

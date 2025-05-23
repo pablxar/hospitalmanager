@@ -12,48 +12,64 @@ class AnalisisClinicoGestion:
     def generar_tablas(self, df: pd.DataFrame):
         tablas = {}
 
-        if 'Estancia del episodio' in df.columns and 'DG01 principal (descripcion)' in df.columns:
-            tablas['estancia_promedio_por_diagnostico'] = df.groupby('DG01 principal (descripcion)', observed=False)['Estancia del episodio'].mean().sort_values(ascending=False).reset_index()
+        # Promedio de estancia por "Diag 01 Principal (cod+des)"
+        if 'Estancia del Episodio' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
+            tablas['estancia_promedio_por_diagnostico'] = (
+                df.groupby('Diag 01 Principal (cod+des)', observed=False)['Estancia del Episodio']
+                .mean()
+                .sort_values(ascending=False)
+                .reset_index()
+            )
 
-        if 'Valor a Pagar' in df.columns and 'DG01 principal (descripcion)' in df.columns:
-            tablas['costos_promedio_por_diagnostico'] = df.groupby('DG01 principal (descripcion)', observed=False)['Valor a Pagar'].mean().sort_values(ascending=False).reset_index()
+        # Promedio de estancia por "Tipo Ingreso (Descripción)"
+        if 'Tipo Ingreso (Descripción)' in df.columns and 'Estancia del Episodio' in df.columns:
+            tablas['estancia_promedio_por_tipo_ingreso'] = (
+                df.groupby('Tipo Ingreso (Descripción)', observed=False)['Estancia del Episodio']
+                .mean()
+                .sort_values(ascending=False)
+                .reset_index()
+            )
 
-        if 'Tipo Actividad' in df.columns and 'Estancia del episodio' in df.columns:
-            tablas['estancia_promedio_por_tipo_actividad'] = df.groupby('Tipo Actividad', observed=False)['Estancia del episodio'].mean().sort_values(ascending=False).reset_index()
-
-        if 'Edad en Años' in df.columns and 'DG01 principal (descripcion)' in df.columns:
-            df['Grupo Etario'] = pd.cut(df['Edad en Años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
-            tablas['frecuencia_diagnosticos_por_edad'] = df.groupby(['Grupo Etario', 'DG01 principal (descripcion)'], observed=False).size().unstack(fill_value=0)
+        # Frecuencia de diagnósticos por grupo etario
+        if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
+            df['Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
+            tablas['frecuencia_diagnosticos_por_edad'] = (
+                df.groupby(['Grupo Etario', 'Diag 01 Principal (cod+des)'], observed=False)
+                .size()
+                .unstack(fill_value=0)
+            )
 
         return tablas
 
     def generar_graficos(self, df: pd.DataFrame):
         graficos = {}
 
-        if 'Valor a Pagar' in df.columns and 'Previsión' in df.columns:
+        # Boxplot de Estancia del Episodio por "Prevision (Desc)"
+        if 'Estancia del Episodio' in df.columns and 'Prevision (Desc)' in df.columns:
             fig, ax = plt.subplots()
-            df.boxplot(column='Valor a Pagar', by='Previsión', grid=False, ax=ax)
-            ax.set_title('Distribución del Valor a Pagar por Previsión')
+            df.boxplot(column='Estancia del Episodio', by='Prevision (Desc)', grid=False, ax=ax)
+            ax.set_title('Distribución de Estancia por Previsión')
             ax.set_xlabel('Previsión')
-            ax.set_ylabel('Valor a Pagar')
+            ax.set_ylabel('Estancia del Episodio')
             plt.suptitle('')
             buf = io.BytesIO()
             fig.savefig(buf, format='png')
             plt.close(fig)
             buf.seek(0)
-            graficos['boxplot_valor_por_prevision.png'] = buf.getvalue()
+            graficos['boxplot_estancia_por_prevision.png'] = buf.getvalue()
 
-        if 'Peso GRD medio' in df.columns and 'Valor a Pagar' in df.columns:
+        # Scatter Peso GRD vs Estancia del Episodio (en lugar de Valor a Pagar)
+        if 'Peso GRD' in df.columns and 'Estancia del Episodio' in df.columns:
             fig, ax = plt.subplots()
-            ax.scatter(df['Peso GRD medio'], df['Valor a Pagar'])
-            ax.set_title('Relación entre Peso GRD medio y Valor a Pagar')
-            ax.set_xlabel('Peso GRD medio')
-            ax.set_ylabel('Valor a Pagar')
+            ax.scatter(df['Peso GRD'], df['Estancia del Episodio'])
+            ax.set_title('Relación entre Peso GRD y Estancia del Episodio')
+            ax.set_xlabel('Peso GRD')
+            ax.set_ylabel('Estancia del Episodio')
             buf = io.BytesIO()
             fig.savefig(buf, format='png')
             plt.close(fig)
             buf.seek(0)
-            graficos['scatter_peso_vs_valor.png'] = buf.getvalue()
+            graficos['scatter_peso_vs_estancia.png'] = buf.getvalue()
 
         return graficos
 
@@ -69,4 +85,4 @@ class AnalisisClinicoGestion:
 
     @staticmethod
     def get_total_steps():
-        return 6
+        return 5

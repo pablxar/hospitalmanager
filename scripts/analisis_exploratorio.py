@@ -9,17 +9,38 @@ class AnalisisExploratorio:
         self.page = page
         self.nombre_archivo = nombre_archivo
 
-    def analisis_estadistico(self, df: pd.DataFrame):
-        resumen = df.describe(include='all')
-        return resumen
+    def generar_tablas(self, df: pd.DataFrame):
+        tablas = {}
+
+        # Conteo por Motivo Egreso (Descripción)
+        if 'Motivo Egreso (Descripción)' in df.columns:
+            conteo = df['Motivo Egreso (Descripción)'].value_counts().reset_index()
+            conteo.columns = ['Motivo Egreso', 'Frecuencia']
+            tablas['conteo_motivo_egreso'] = conteo
+
+        # Distribución por Tipo Ingreso (Descripción)
+        if 'Tipo Ingreso (Descripción)' in df.columns:
+            distribucion = df['Tipo Ingreso (Descripción)'].value_counts().reset_index()
+            distribucion.columns = ['Tipo Ingreso', 'Frecuencia']
+            tablas['distribucion_tipo_ingreso'] = distribucion
+
+        # Distribución por Sexo (Desc)
+        if 'Sexo (Desc)' in df.columns:
+            distribucion_sexo = df['Sexo (Desc)'].value_counts().reset_index()
+            distribucion_sexo.columns = ['Sexo', 'Frecuencia']
+            tablas['distribucion_sexo'] = distribucion_sexo
+
+        # Puedes agregar más tablas según tu análisis
+
+        return tablas
 
     def generar_graficos(self, df: pd.DataFrame):
         graficos = {}
 
-        # Histograma de edades en memoria
-        if 'Edad en Años' in df.columns:
+        # Histograma de Edad en años
+        if 'Edad en años' in df.columns:
             fig, ax = plt.subplots()
-            df['Edad en Años'].hist(bins=20, ax=ax)
+            df['Edad en años'].hist(bins=20, ax=ax)
             ax.set_title('Histograma de Edad')
             ax.set_xlabel('Edad')
             ax.set_ylabel('Frecuencia')
@@ -29,10 +50,10 @@ class AnalisisExploratorio:
             buf.seek(0)
             graficos['histograma_edad.png'] = buf.getvalue()
 
-        # Barras: Motivo de egreso en memoria
-        if 'Motivo Egreso (descripción)' in df.columns:
+        # Barras Motivo Egreso (Descripción)
+        if 'Motivo Egreso (Descripción)' in df.columns:
             fig, ax = plt.subplots()
-            df['Motivo Egreso (descripción)'].value_counts().plot(kind='bar', ax=ax)
+            df['Motivo Egreso (Descripción)'].value_counts().plot(kind='bar', ax=ax)
             ax.set_title('Frecuencia por Motivo de Egreso')
             ax.set_xlabel('Motivo de Egreso')
             ax.set_ylabel('Frecuencia')
@@ -42,24 +63,24 @@ class AnalisisExploratorio:
             buf.seek(0)
             graficos['barras_motivo_egreso.png'] = buf.getvalue()
 
-        # Barras: Tipo de actividad en memoria
-        if 'Tipo Actividad' in df.columns:
+        # Barras Tipo Ingreso (Descripción)
+        if 'Tipo Ingreso (Descripción)' in df.columns:
             fig, ax = plt.subplots()
-            df['Tipo Actividad'].value_counts().plot(kind='bar', color='orange', ax=ax)
-            ax.set_title('Distribución por Tipo de Actividad')
-            ax.set_xlabel('Tipo de Actividad')
+            df['Tipo Ingreso (Descripción)'].value_counts().plot(kind='bar', color='orange', ax=ax)
+            ax.set_title('Distribución por Tipo de Ingreso')
+            ax.set_xlabel('Tipo de Ingreso')
             ax.set_ylabel('Frecuencia')
             buf = io.BytesIO()
             fig.savefig(buf, format='png')
             plt.close(fig)
             buf.seek(0)
-            graficos['barras_tipo_actividad.png'] = buf.getvalue()
+            graficos['barras_tipo_ingreso.png'] = buf.getvalue()
 
         return graficos
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
         resultados = {}
-        resultados['estadisticas'] = self.analisis_estadistico(df)
+        resultados['tablas'] = self.generar_tablas(df)
         if update_progress:
             update_progress()
         resultados['graficos'] = self.generar_graficos(df)
@@ -69,4 +90,4 @@ class AnalisisExploratorio:
 
     @staticmethod
     def get_total_steps():
-        return 4
+        return 6

@@ -48,7 +48,7 @@ class MainApp(ft.Container):
         self.show_login()
 
     def show_login(self):
-        self.page.title = "Logeo - Manager Reports App"
+        self.page.title = "Login - Manager Reports App"
         self.page.icon = "assets/logo.ico"  # Cambiar el icono de la ventana
         self.page.controls.clear()
 
