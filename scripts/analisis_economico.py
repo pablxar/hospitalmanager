@@ -9,7 +9,7 @@ class AnalisisEconomico:
         self.page = page
         self.nombre_archivo = nombre_archivo
 
-    def generar_tablas(self, df: pd.DataFrame):
+    def generar_tablas(self, df: pd.DataFrame, update_progress=None):
         tablas = {}
 
         # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
@@ -19,19 +19,25 @@ class AnalisisEconomico:
             conteo_esp = df['Especialidad (Descripción )'].value_counts().reset_index()
             conteo_esp.columns = ['Especialidad', 'Frecuencia']
             tablas['conteo_especialidad'] = conteo_esp
+            if update_progress:
+                update_progress()
         # Distribución por "Nivel de severidad (Descripción)"
         if 'Nivel de severidad (Descripción)' in df.columns:
             distrib_severidad = df['Nivel de severidad (Descripción)'].value_counts().reset_index()
             distrib_severidad.columns = ['Nivel de severidad', 'Frecuencia']
             tablas['distribucion_nivel_severidad'] = distrib_severidad
+            if update_progress:
+                update_progress()
         # Promedio de estancia por nivel de severidad
         if 'Nivel de severidad (Descripción)' in df.columns and 'Estancia del Episodio' in df.columns:
             promedio_estancia = df.groupby('Nivel de severidad (Descripción)')['Estancia del Episodio'].mean().reset_index()
             tablas['promedio_estancia_por_severidad'] = promedio_estancia
+            if update_progress:
+                update_progress()
 
         return tablas
 
-    def generar_graficos(self, df: pd.DataFrame):
+    def generar_graficos(self, df: pd.DataFrame, update_progress=None):
         graficos = {}
 
         # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
@@ -48,7 +54,8 @@ class AnalisisEconomico:
             plt.close(fig)
             buf.seek(0)
             graficos['barras_especialidad.png'] = buf.getvalue()
-
+            if update_progress:
+                update_progress()
         # Barras por Nivel de severidad
         if 'Nivel de severidad (Descripción)' in df.columns:
             fig, ax = plt.subplots()
@@ -61,7 +68,8 @@ class AnalisisEconomico:
             plt.close(fig)
             buf.seek(0)
             graficos['barras_nivel_severidad.png'] = buf.getvalue()
-
+            if update_progress:
+                update_progress()
         # Barras promedio estancia por severidad
         if 'Nivel de severidad (Descripción)' in df.columns and 'Estancia del Episodio' in df.columns:
             promedio_estancia = df.groupby('Nivel de severidad (Descripción)')['Estancia del Episodio'].mean()
@@ -75,17 +83,15 @@ class AnalisisEconomico:
             plt.close(fig)
             buf.seek(0)
             graficos['promedio_estancia_severidad.png'] = buf.getvalue()
+            if update_progress:
+                update_progress()
 
         return graficos
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
         resultados = {}
-        resultados['tablas'] = self.generar_tablas(df)
-        if update_progress:
-            update_progress()
-        resultados['graficos'] = self.generar_graficos(df)
-        if update_progress:
-            update_progress()
+        resultados['tablas'] = self.generar_tablas(df, update_progress)
+        resultados['graficos'] = self.generar_graficos(df, update_progress)
         return resultados
 
     @staticmethod

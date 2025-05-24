@@ -53,28 +53,79 @@ class ReportsView(ft.Container):
             expand=True,
             spacing=10,
             controls=[
-                self.create_report_item(analysis[1], analysis[2], analysis[0]) for analysis in analyses
+                self.create_report_item(analysis[1], analysis[2], analysis[0], analysis[0]) for analysis in analyses
             ]
         )
 
-    def create_report_item(self, title: str, date: str, file_content: bytes):
+    def create_report_item(self, title: str, date: str, file_content: bytes, analysis_id=None):
+        def show_delete_dialog(e):
+            dialog = ft.AlertDialog(
+                modal=True,
+                open=True,
+                title=ft.Text("Confirmar eliminación"),
+                content=ft.Text(f"¿Estás seguro de que deseas eliminar el reporte '{title}'?"),
+                actions=[
+                    ft.TextButton("Cancelar", on_click=lambda ev: self.close_dialog()),
+                    ft.TextButton("Eliminar", on_click=lambda ev: self.confirm_delete(analysis_id, title)),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            self.page.dialog = dialog
+            if dialog not in self.page.overlay:
+                self.page.overlay.append(dialog)
+            dialog.open = True
+            self.page.update()
+
         return ft.Card(
             elevation=5,
             color=self.bg_color,
             content=ft.Container(
                 padding=20,
-                content=ft.Column(
-                    controls=[
-                        ft.Text(title, size=18, weight=ft.FontWeight.BOLD, color=self.white_color),
-                        ft.Text(f"Fecha: {date}", size=14, color=self.text_color),
-                        ft.ElevatedButton(
-                            text="Descargar",
-                            on_click=lambda e, content=file_content, name=title: self.download_file(content, name)
+                content=ft.Row([
+                    ft.Container(
+                        expand=True,
+                        content=ft.Column(
+                            controls=[
+                                ft.Text(title, size=18, weight=ft.FontWeight.BOLD, color=self.white_color),
+                                ft.Text(f"Fecha: {date}", size=14, color=self.text_color),
+                                ft.ElevatedButton(
+                                    text="Descargar",
+                                    on_click=lambda e, content=file_content, name=title: self.download_file(content, name)
+                                )
+                            ]
                         )
-                    ]
-                )
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.DELETE,
+                        tooltip="Eliminar reporte",
+                        icon_color=ft.Colors.RED,
+                        on_click=show_delete_dialog
+                    )
+                ])
             )
         )
+
+    def close_dialog(self):
+        if self.page.dialog:
+            self.page.dialog.open = False
+            self.page.update()
+            self.page.dialog = None
+
+    def confirm_delete(self, analysis_id, title):
+        try:
+            self.db_manager.delete_analysis_by_id(analysis_id)
+            snackbar = ft.SnackBar(
+                content=ft.Text(f"Reporte '{title}' eliminado correctamente.", color=ft.Colors.WHITE),
+                bgcolor="#4CAF50",
+                behavior=ft.SnackBarBehavior.FLOATING,
+            )
+            self.page.overlay.append(snackbar)
+            snackbar.open = True
+            self.reload_reports()
+            self.page.update()
+        except Exception as ex:
+            self.notifications_manager.add_notification(f"Error al eliminar el reporte: {ex}")
+        self.close_dialog()
 
     def download_file(self, file_content: bytes, file_name: str):
         def save_file(event):

@@ -10,7 +10,7 @@ class AnalisisCohortes:
         self.page = page
         self.nombre_archivo = nombre_archivo
 
-    def generar_tablas(self, df: pd.DataFrame):
+    def generar_tablas(self, df: pd.DataFrame, update_progress=None):
         # Siempre extraer año y mes de la fecha de egreso
         df = df.copy()
         df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
@@ -33,12 +33,14 @@ class AnalisisCohortes:
                 labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
             tabla_diagnosticos = df.groupby(['Grupo Etario', 'Diag 01 Principal (cod+des)'], observed=False).size().unstack(fill_value=0)
             resultados['diagnosticos_por_grupo_etario'] = tabla_diagnosticos
-
+            if update_progress:
+                update_progress()
         # Promedio de estancia por grupo etario
         if 'Estancia del Episodio' in df.columns:
             promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean().reset_index()
             resultados['promedio_estancia_por_grupo_etario'] = promedio_estancia
-
+            if update_progress:
+                update_progress()
         # Conteo de egresos por mes (usando "Fecha egreso completa")
         if 'Fecha de egreso completa' in df.columns:
             df = df.copy()
@@ -47,10 +49,11 @@ class AnalisisCohortes:
             df.loc[:, 'Mes de Egreso'] = df['Fecha de egreso completa'].dt.to_period('M')
             conteo_egresos = df.groupby('Mes de Egreso', observed=False).size().reset_index(name='Egresos')
             resultados['egresos_por_mes'] = conteo_egresos
-
+            if update_progress:
+                update_progress()
         return resultados
 
-    def generar_graficos(self, df: pd.DataFrame):
+    def generar_graficos(self, df: pd.DataFrame, update_progress=None):
         # Siempre extraer año y mes de la fecha de egreso
         df = df.copy()
         df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
@@ -71,6 +74,7 @@ class AnalisisCohortes:
             df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
             heatmap_data = df.pivot_table(index='Grupo Etario', columns='Diag 01 Principal (cod+des)', aggfunc='size', fill_value=0, observed=False)
             plt.figure(figsize=(14, 10))
+            import seaborn as sns
             sns.heatmap(heatmap_data, annot=False, cmap="YlGnBu")
             plt.title('Heatmap de Diagnósticos por Grupo Etario')
             buffer = io.BytesIO()
@@ -78,7 +82,8 @@ class AnalisisCohortes:
             buffer.seek(0)
             resultados['heatmap_diagnosticos_etario.png'] = buffer.getvalue()
             plt.close()
-
+            if update_progress:
+                update_progress()
         # Línea comparativa de egresos mensuales por año
         if 'Fecha de egreso completa' in df.columns:
             df = df.copy()
@@ -103,7 +108,8 @@ class AnalisisCohortes:
             plt.close(fig)
             buf.seek(0)
             resultados['linea_egresos_mensuales_comparativo.png'] = buf.getvalue()
-        
+            if update_progress:
+                update_progress()
         # Línea comparativa de egresos mensuales por año (solo año más reciente y anterior, hasta el mes máximo)
         egresos = df_comp.groupby(['Mes', 'Año']).size().unstack(level=1, fill_value=0)
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -122,7 +128,8 @@ class AnalisisCohortes:
         plt.close(fig)
         buf.seek(0)
         resultados['linea_egresos_mensuales_comparativo.png'] = buf.getvalue()
-
+        if update_progress:
+            update_progress()
         # Barras promedio estancia por grupo etario
         if 'Edad en años' in df.columns and 'Estancia del Episodio' in df.columns:
             df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
@@ -137,16 +144,13 @@ class AnalisisCohortes:
             buffer.seek(0)
             resultados['barras_promedio_estancia.png'] = buffer.getvalue()
             plt.close()
-
+            if update_progress:
+                update_progress()
         return resultados
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
-        tablas = self.generar_tablas(df)
-        if update_progress:
-            update_progress()
-        graficos = self.generar_graficos(df)
-        if update_progress:
-            update_progress()
+        tablas = self.generar_tablas(df, update_progress)
+        graficos = self.generar_graficos(df, update_progress)
         return {"tablas": tablas, "graficos": graficos}
 
     @staticmethod

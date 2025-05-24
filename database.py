@@ -90,5 +90,12 @@ class DatabaseManager:
                 (analysis_id,)
             ).fetchone()
 
+    def delete_analysis_by_id(self, analysis_id):
+        with self.connection:
+            self.connection.execute(
+                "DELETE FROM analyses WHERE id = ?",
+                (analysis_id,)
+            )
+
     def close(self):
         self.connection.close()

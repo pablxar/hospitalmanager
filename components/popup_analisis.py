@@ -33,6 +33,9 @@ class PopupAnalisisManager:
         self.file_picker = ft.FilePicker(on_result=self.ejecutar_analisis)
         self.page.overlay.append(self.file_picker)
 
+        self.status_text = ft.Text("", size=16, color=ft.Colors.AMBER, visible=False)
+        self.indeterminate_bar = ft.ProgressBar(width=400, visible=False, color=ft.Colors.AMBER, bgcolor=ft.Colors.with_opacity(0.2, ft.Colors.AMBER), bar_height=4, value=None)
+
         self.popup = ft.AlertDialog(
             modal=True,
             open=False,
@@ -42,6 +45,8 @@ class PopupAnalisisManager:
                     self.close_btn
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 self.upload_btn,
+                self.status_text,
+                self.indeterminate_bar,
                 self.progress_bar,
                 self.progress_text,
                 self.error_text,
@@ -133,28 +138,42 @@ class PopupAnalisisManager:
             raise ValueError(f"Faltan columnas: {', '.join(faltantes)}")
         return df
 
-    def update_progress(self):
+    def update_progress(self, etapa=None):
         self.current_step += 1
         self.progress_bar.value = self.current_step / self.total_steps
         self.progress_text.value = f"{self.current_step}/{self.total_steps}"
+        if etapa:
+            self.status_text.value = f"Procesando etapa: {etapa.capitalize()}..."
+        self.status_text.visible = True
+        self.indeterminate_bar.visible = True if self.current_step < self.total_steps else False
         self.popup.update()
 
     def ejecutar_analisis(self, e):
         if self.file_picker.result.files:
             path = self.file_picker.result.files[0].path
             try:
+                self.status_text.value = "Cargando y verificando datos..."
+                self.status_text.visible = True
+                self.indeterminate_bar.visible = True
+                self.popup.update()
                 df = self.verificar_columnas(self.cargar_datos(path))
+                df = df.fillna(method='ffill')
             except Exception as ex:
                 self.error_text.value = str(ex)
                 self.error_text.visible = True
+                self.status_text.visible = False
+                self.indeterminate_bar.visible = False
                 self.popup.update()
                 return
             self.progress_bar.visible = True
             self.progress_text.visible = True
             self.upload_btn.visible = False
             self.error_text.visible = False
-            self.download_btn.visible = False  # Ocultar durante el análisis
-            self.download_btn.disabled = True  # Deshabilitar durante el análisis
+            self.download_btn.visible = False
+            self.download_btn.disabled = True
+            self.status_text.value = "Generando tablas de producción..."
+            self.status_text.visible = True
+            self.indeterminate_bar.visible = True
             self.popup.update()
             self.total_steps = (
                 AnalisisProduccion.get_total_steps() +
@@ -162,31 +181,33 @@ class PopupAnalisisManager:
                 AnalisisClinicoGestion.get_total_steps() +
                 AnalisisCohortes.get_total_steps()
             )
-            self.resultados["produccion"] = AnalisisProduccion(self.page, path).ejecutar_analisis(df, self.update_progress)
-            self.resultados["economico"] = AnalisisEconomico(self.page, path).ejecutar_analisis(df, self.update_progress)
-            self.resultados["clinico"] = AnalisisClinicoGestion(self.page, path).ejecutar_analisis(df, self.update_progress)
-            self.resultados["cohortes"] = AnalisisCohortes(self.page, path).ejecutar_analisis(df, self.update_progress)
+            self.resultados["produccion"] = AnalisisProduccion(self.page, path).ejecutar_analisis(df, lambda: self.update_progress("producción"))
+            self.status_text.value = "Generando tablas y gráficos económicos..."
+            self.popup.update()
+            self.resultados["economico"] = AnalisisEconomico(self.page, path).ejecutar_analisis(df, lambda: self.update_progress("económico"))
+            self.status_text.value = "Generando tablas y gráficos clínicos..."
+            self.popup.update()
+            self.resultados["clinico"] = AnalisisClinicoGestion(self.page, path).ejecutar_analisis(df, lambda: self.update_progress("clínico"))
+            self.status_text.value = "Generando tablas y gráficos de cohortes..."
+            self.popup.update()
+            self.resultados["cohortes"] = AnalisisCohortes(self.page, path).ejecutar_analisis(df, lambda: self.update_progress("cohortes"))
+            self.status_text.value = "Comprimiendo resultados..."
+            self.popup.update()
             self.progress_bar.visible = False
             self.progress_text.visible = False
             self.zip_buffer = self.crear_zip_en_memoria()
             self.download_btn.visible = True
             self.download_btn.disabled = False
+            self.status_text.value = "¡Análisis finalizado! Puedes descargar los resultados."
+            self.indeterminate_bar.visible = False
             self.popup.update()
-
         else:
             self.error_text.value = "No se seleccionó ningún archivo."
             self.error_text.visible = True
+            self.status_text.visible = False
+            self.indeterminate_bar.visible = False
             self.popup.update()
 
-    async def on_zip_ready(self, zip_result):
-        self.zip_buffer = zip_result
-        self.download_btn.text = "Descargar Resultados"
-        self.download_btn.disabled = False
-        self.file_picker.on_result = self.guardar_zip
-        self.file_picker.save_file(file_name="resultados.zip")
-        self.popup.update()
-
-    
     def descargar_resultados(self, e):
         if self.zip_buffer:
             self.file_picker.on_result = self.guardar_zip

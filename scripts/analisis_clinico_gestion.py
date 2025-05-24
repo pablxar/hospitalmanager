@@ -9,7 +9,7 @@ class AnalisisClinicoGestion:
         self.page = page
         self.nombre_archivo = nombre_archivo
 
-    def generar_tablas(self, df: pd.DataFrame):
+    def generar_tablas(self, df: pd.DataFrame, update_progress=None):
         tablas = {}
 
         # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
@@ -22,7 +22,8 @@ class AnalisisClinicoGestion:
                 .sort_values(ascending=False)
                 .reset_index()
             )
-
+            if update_progress:
+                update_progress()
         # Promedio de estancia por "Tipo Ingreso (Descripción)"
         if 'Tipo Ingreso (Descripción)' in df.columns and 'Estancia del Episodio' in df.columns:
             tablas['estancia_promedio_por_tipo_ingreso'] = (
@@ -31,7 +32,8 @@ class AnalisisClinicoGestion:
                 .sort_values(ascending=False)
                 .reset_index()
             )
-
+            if update_progress:
+                update_progress()
         # Frecuencia de diagnósticos por grupo etario
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
             df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
@@ -40,10 +42,11 @@ class AnalisisClinicoGestion:
                 .size()
                 .unstack(fill_value=0)
             )
-
+            if update_progress:
+                update_progress()
         return tablas
 
-    def generar_graficos(self, df: pd.DataFrame):
+    def generar_graficos(self, df: pd.DataFrame, update_progress=None):
         graficos = {}
 
         # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
@@ -61,7 +64,8 @@ class AnalisisClinicoGestion:
             plt.close(fig)
             buf.seek(0)
             graficos['boxplot_estancia_por_prevision.png'] = buf.getvalue()
-
+            if update_progress:
+                update_progress()
         # Scatter Peso GRD vs Estancia del Episodio (en lugar de Valor a Pagar)
         if 'Peso GRD' in df.columns and 'Estancia del Episodio' in df.columns:
             fig, ax = plt.subplots()
@@ -74,17 +78,14 @@ class AnalisisClinicoGestion:
             plt.close(fig)
             buf.seek(0)
             graficos['scatter_peso_vs_estancia.png'] = buf.getvalue()
-
+            if update_progress:
+                update_progress()
         return graficos
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
         resultados = {}
-        resultados['tablas'] = self.generar_tablas(df)
-        if update_progress:
-            update_progress()
-        resultados['graficos'] = self.generar_graficos(df)
-        if update_progress:
-            update_progress()
+        resultados['tablas'] = self.generar_tablas(df, update_progress)
+        resultados['graficos'] = self.generar_graficos(df, update_progress)
         return resultados
 
     @staticmethod
