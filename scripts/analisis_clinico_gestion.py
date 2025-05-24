@@ -12,6 +12,8 @@ class AnalisisClinicoGestion:
     def generar_tablas(self, df: pd.DataFrame):
         tablas = {}
 
+        # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
+        df = df.copy()
         # Promedio de estancia por "Diag 01 Principal (cod+des)"
         if 'Estancia del Episodio' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
             tablas['estancia_promedio_por_diagnostico'] = (
@@ -32,7 +34,7 @@ class AnalisisClinicoGestion:
 
         # Frecuencia de diagnósticos por grupo etario
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
-            df['Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
+            df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
             tablas['frecuencia_diagnosticos_por_edad'] = (
                 df.groupby(['Grupo Etario', 'Diag 01 Principal (cod+des)'], observed=False)
                 .size()
@@ -44,6 +46,8 @@ class AnalisisClinicoGestion:
     def generar_graficos(self, df: pd.DataFrame):
         graficos = {}
 
+        # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
+        df = df.copy()
         # Boxplot de Estancia del Episodio por "Prevision (Desc)"
         if 'Estancia del Episodio' in df.columns and 'Prevision (Desc)' in df.columns:
             fig, ax = plt.subplots()

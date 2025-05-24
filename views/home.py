@@ -1,6 +1,6 @@
 import flet as ft
 from components.notifications import NotificationsManager
-from components.popup_analisis import crear_popup_analisis
+from components.popup_analisis import PopupAnalisisManager
 
 class HomeView(ft.Container):
     def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager, user):
@@ -15,8 +15,8 @@ class HomeView(ft.Container):
         self.notifications_manager = notifications_manager
         self.user = user
 
-        self.popup, self.file_picker = crear_popup_analisis(self.page, self.user)
-        self.page.dialog = self.popup
+        # Elimina la línea: self.popup, self.file_picker = crear_popup_analisis(self.page, self.user)
+        # self.page.dialog = self.popup
 
         self.content = ft.Column(
             scroll=ft.ScrollMode.AUTO,
@@ -82,17 +82,16 @@ class HomeView(ft.Container):
             )
         )
     def on_new_analysis_click(self, e):
-        # Asegúrate de que el popup esté configurado correctamente
-        if not self.popup:
-            self.popup, self.file_picker = crear_popup_analisis(self.page)
-            self.popup.alignment = ft.alignment.center  # Centrar el popup
+        # Usar el nuevo manager de clase para el popup
+        popup_manager = PopupAnalisisManager(self.page, self.user)
+        self.popup, self.file_picker = popup_manager.popup, popup_manager.file_picker
+        self.popup.alignment = ft.alignment.center
 
-        # Agregar el popup al overlay si no está presente
         if self.popup not in self.page.overlay:
             self.page.overlay.append(self.popup)
 
-        # Mostrar el popup sobre la vista actual
         self.popup.open = True
+        self.page.dialog = self.popup
         self.page.update()
 
     def create_graph_section(self):

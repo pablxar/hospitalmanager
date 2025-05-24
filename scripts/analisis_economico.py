@@ -12,18 +12,18 @@ class AnalisisEconomico:
     def generar_tablas(self, df: pd.DataFrame):
         tablas = {}
 
+        # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
+        df = df.copy()
         # Conteo por "Especialidad (Descripción)"
         if 'Especialidad (Descripción )' in df.columns:
             conteo_esp = df['Especialidad (Descripción )'].value_counts().reset_index()
             conteo_esp.columns = ['Especialidad', 'Frecuencia']
             tablas['conteo_especialidad'] = conteo_esp
-
         # Distribución por "Nivel de severidad (Descripción)"
         if 'Nivel de severidad (Descripción)' in df.columns:
             distrib_severidad = df['Nivel de severidad (Descripción)'].value_counts().reset_index()
             distrib_severidad.columns = ['Nivel de severidad', 'Frecuencia']
             tablas['distribucion_nivel_severidad'] = distrib_severidad
-
         # Promedio de estancia por nivel de severidad
         if 'Nivel de severidad (Descripción)' in df.columns and 'Estancia del Episodio' in df.columns:
             promedio_estancia = df.groupby('Nivel de severidad (Descripción)')['Estancia del Episodio'].mean().reset_index()
@@ -34,6 +34,8 @@ class AnalisisEconomico:
     def generar_graficos(self, df: pd.DataFrame):
         graficos = {}
 
+        # Siempre trabajar sobre una copia para evitar SettingWithCopyWarning
+        df = df.copy()
         # Barras por Especialidad
         if 'Especialidad (Descripción )' in df.columns:
             fig, ax = plt.subplots()

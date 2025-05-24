@@ -1,115 +1,126 @@
 import flet as ft
 import pandas as pd
 import io
+import asyncio
 from zipfile import ZipFile
 from datetime import datetime
 from database import DatabaseManager
 import matplotlib.pyplot as plt
-from flet import ControlEvent as control_event
 
-from scripts.analisis_exploratorio import AnalisisExploratorio
+from scripts.analisis_produccion import AnalisisProduccion
 from scripts.analisis_economico import AnalisisEconomico
 from scripts.analisis_clinico_gestion import AnalisisClinicoGestion
 from scripts.analisis_cohortes import AnalisisCohortes
 
-def crear_zip_en_memoria(resultados_dict):
-    zip_buffer = io.BytesIO()
-    with ZipFile(zip_buffer, "w") as zip_file:
-        for nombre_analisis, resultados in resultados_dict.items():
-            tablas = resultados.get('tablas') or {}
-            if 'estadisticas' in resultados and isinstance(resultados['estadisticas'], pd.DataFrame):
-                tablas = {'estadisticas': resultados['estadisticas']}
-            for nombre_tabla, df in tablas.items():
-                # Formatear valores numéricos a 4 decimales
-                df = df.applymap(lambda x: f"{x:.4f}" if isinstance(x, (int, float)) else x)
-
-                # Cálculo dinámico de tamaño y fuente
-                ncols = len(df.columns)
-                nrows = len(df)
-                fig_width = max(14, ncols * 1.2)      # 1.2 pulgadas por columna mínimo
-                fig_height = max(1, min(0.7 * nrows, 40))  # Altura proporcional con máximo
-
-                header_fontsize = 14
-                cell_fontsize = 12
-
-                fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-                ax.axis('off')
-
-                col_colors = ['#4CAF50'] * ncols
-
-                table = ax.table(
-                    cellText=df.values,
-                    colLabels=df.columns,
-                    loc='center',
-                    cellLoc='center',
-                    colColours=col_colors
-                )
-
-                for (row, col), cell in table.get_celld().items():
-                    cell.set_linewidth(0.5)
-                    if row == 0:
-                        cell.set_text_props(weight='bold', color='white', fontsize=header_fontsize)
-                        cell.set_facecolor('#4CAF50')
-                    else:
-                        cell.set_text_props(fontsize=cell_fontsize)
-                        cell.set_facecolor('#F5F5F5')
-
-                table.auto_set_font_size(False)
-                table.scale(1.5, 1.5)
-
-                plt.tight_layout()
-                img_buffer = io.BytesIO()
-                plt.savefig(img_buffer, format='png', bbox_inches='tight')
-                plt.close(fig)
-                img_buffer.seek(0)
-
-                zip_file.writestr(f"{nombre_analisis}/tablas/{nombre_tabla}.png", img_buffer.getvalue())
-
-            graficos = resultados.get('graficos', {})
-            for nombre_img, img_bytes in graficos.items():
-                zip_file.writestr(f"{nombre_analisis}/graficos/{nombre_img}", img_bytes)
-    zip_buffer.seek(0)
-    return zip_buffer
+class PopupAnalisisManager:
+    def __init__(self, page: ft.Page, user):
+        self.page = page
+        self.user = user
+        self.resultados = {}
+        self.current_step = 0
+        self.total_steps = 0
+        self.zip_buffer = None
+        self.db_manager = DatabaseManager()
 
 
-def crear_popup_analisis(page: ft.Page, user):
-    progress_bar = ft.ProgressBar(width=400, value=0, visible=False)
-    progress_text = ft.Text("0/0", size=16, visible=False)
-    error_text = ft.Text("", color=ft.Colors.RED, visible=False)
-    download_btn = ft.ElevatedButton("Descargar Resultados", visible=False)
+        self.progress_bar = ft.ProgressBar(width=400, value=0, visible=False)
+        self.progress_text = ft.Text("0/0", size=16, visible=False)
+        self.error_text = ft.Text("", color=ft.Colors.RED, visible=False)
+        self.download_btn = ft.ElevatedButton("Descargar Resultados", visible=False)
+        self.upload_btn = ft.ElevatedButton("Subir Base de Datos", on_click=lambda e: self.file_picker.pick_files())
+        self.close_btn = ft.IconButton(icon=ft.Icons.CLOSE, on_click=self.cerrar_popup)
 
-    resultados = {}
-    current_step = 0
-    total_steps = 0
-    zip_buffer = None
+        self.file_picker = ft.FilePicker(on_result=self.ejecutar_analisis)
+        self.page.overlay.append(self.file_picker)
 
-    def resetear_estado():
-        nonlocal resultados, current_step, total_steps, zip_buffer
-        resultados = {}
-        current_step = 0
-        total_steps = 0
-        zip_buffer = None
-        progress_bar.value = 0
-        progress_bar.visible = False
-        progress_text.value = ""
-        progress_text.visible = False
-        error_text.value = ""
-        error_text.visible = False
-        download_btn.visible = False
-        upload_btn.visible = True
+        self.popup = ft.AlertDialog(
+            modal=True,
+            open=False,
+            content=ft.Column([
+                ft.Row([
+                    ft.Text("Análisis de Base de Datos", size=20, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                    self.close_btn
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                self.upload_btn,
+                self.progress_bar,
+                self.progress_text,
+                self.error_text,
+                self.download_btn
+            ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                tight=True,
+            ),
+            actions_alignment=ft.MainAxisAlignment.CENTER,
+        )
 
-    def cargar_datos(path):
+        self.download_btn.on_click = self.descargar_resultados
+
+    def crear_zip_en_memoria(self):
+        zip_buffer = io.BytesIO()
+        with ZipFile(zip_buffer, "w") as zip_file:
+            for nombre_analisis, resultados in self.resultados.items():
+                tablas = resultados.get('tablas') or {}
+                if 'estadisticas' in resultados and isinstance(resultados['estadisticas'], pd.DataFrame):
+                    tablas = {'estadisticas': resultados['estadisticas']}
+                for nombre_tabla, df in tablas.items():
+                    df = df.map(lambda x: f"{x:.4f}" if isinstance(x, (int, float)) else x)
+                    ncols = len(df.columns)
+                    nrows = len(df)
+                    fig_width = max(14, ncols * 1.2)
+                    fig_height = max(1, min(0.7 * nrows, 40))
+                    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+                    ax.axis('off')
+                    col_colors = ['#4CAF50'] * ncols
+                    table = ax.table(cellText=df.values, colLabels=df.columns, loc='center', cellLoc='center', colColours=col_colors)
+                    for (row, col), cell in table.get_celld().items():
+                        cell.set_linewidth(0.5)
+                        if row == 0:
+                            cell.set_text_props(weight='bold', color='white', fontsize=14)
+                            cell.set_facecolor('#4CAF50')
+                        else:
+                            cell.set_text_props(fontsize=12)
+                            cell.set_facecolor('#F5F5F5')
+                    table.auto_set_font_size(False)
+                    table.scale(1.5, 1.5)
+                    try:
+                        plt.tight_layout()
+                    except Exception:
+                        plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+                    img_buffer = io.BytesIO()
+                    plt.savefig(img_buffer, format='png', bbox_inches='tight')
+                    plt.close(fig)
+                    img_buffer.seek(0)
+                    zip_file.writestr(f"{nombre_analisis}/tablas/{nombre_tabla}.png", img_buffer.getvalue())
+                for nombre_img, img_bytes in resultados.get('graficos', {}).items():
+                    zip_file.writestr(f"{nombre_analisis}/graficos/{nombre_img}", img_bytes)
+        zip_buffer.seek(0)
+        return zip_buffer
+
+    def resetear_estado(self):
+        self.resultados = {}
+        self.current_step = 0
+        self.total_steps = 0
+        self.zip_buffer = None
+        self.progress_bar.value = 0
+        self.progress_bar.visible = False
+        self.progress_text.value = ""
+        self.progress_text.visible = False
+        self.error_text.value = ""
+        self.error_text.visible = False
+        self.download_btn.visible = False
+        self.download_btn.disabled = True  # <-- Deshabilitar por defecto
+        self.upload_btn.visible = True
+
+    def cargar_datos(self, path):
         if path.endswith('.xlsx'):
-            # Saltar las 2 primeras filas y usar la fila 3 como header
             return pd.read_excel(path, header=2)
         elif path.endswith('.csv'):
-            # Si csv no tiene esas filas, solo cargar normal
             return pd.read_csv(path, header=2)
         else:
             raise ValueError("El archivo debe ser .xlsx o .csv")
 
-
-    def verificar_columnas(df):
+    def verificar_columnas(self, df):
         columnas_requeridas = [
             "Año egreso", "Hospital (Descripción)", "GRD", "Especialidad (Descripción )", "Fecha de egreso completa",
             "Sexo (Desc)", "Comuna de residencia ( Desc )", "Fecha ingreso completa", "(SI/NO) VMI", "Motivo Egreso (Descripción)",
@@ -117,159 +128,112 @@ def crear_popup_analisis(page: ft.Page, user):
             "Tipo Ingreso (Descripción)", "Nivel de severidad (Descripción)", "(S/N) Egreso Quirúrgico", "(Si/No) Cesáreas", "Peso GRD",
             "CDM (Descripción)", "Mes egreso (Descripción)", "Edad en años", "Diag 01 Principal (cod+des)", "Estancias [Norma]", "Egresos"
         ]
-        columnas_faltantes = [col for col in columnas_requeridas if col not in df.columns]
-        if columnas_faltantes:
-            raise ValueError(f"Faltan las columnas requeridas: {', '.join(columnas_faltantes)}")
+        faltantes = [col for col in columnas_requeridas if col not in df.columns]
+        if faltantes:
+            raise ValueError(f"Faltan columnas: {', '.join(faltantes)}")
         return df
 
+    def update_progress(self):
+        self.current_step += 1
+        self.progress_bar.value = self.current_step / self.total_steps
+        self.progress_text.value = f"{self.current_step}/{self.total_steps}"
+        self.popup.update()
 
-    def update_progress():
-        nonlocal current_step, total_steps
-        current_step += 1
-        progress_bar.value = current_step / total_steps
-        progress_text.value = f"{current_step}/{total_steps}"
-        popup.update()
-
-    def ejecutar_analisis(e):
-        nonlocal resultados, current_step, total_steps
-        if file_picker.result.files:
-            archivo_datos = file_picker.result.files[0].path
+    def ejecutar_analisis(self, e):
+        if self.file_picker.result.files:
+            path = self.file_picker.result.files[0].path
             try:
-                df = cargar_datos(archivo_datos)
-                df = verificar_columnas(df)
+                df = self.verificar_columnas(self.cargar_datos(path))
             except Exception as ex:
-                error_text.value = str(ex)
-                error_text.visible = True
-                popup.update()
+                self.error_text.value = str(ex)
+                self.error_text.visible = True
+                self.popup.update()
                 return
-
-            progress_bar.visible = True
-            progress_text.visible = True
-            upload_btn.visible = False
-            error_text.visible = False
-            download_btn.visible = False
-            popup.update()
-
-            total_steps = (
-                AnalisisExploratorio.get_total_steps() +
+            self.progress_bar.visible = True
+            self.progress_text.visible = True
+            self.upload_btn.visible = False
+            self.error_text.visible = False
+            self.download_btn.visible = False  # Ocultar durante el análisis
+            self.download_btn.disabled = True  # Deshabilitar durante el análisis
+            self.popup.update()
+            self.total_steps = (
+                AnalisisProduccion.get_total_steps() +
                 AnalisisEconomico.get_total_steps() +
                 AnalisisClinicoGestion.get_total_steps() +
                 AnalisisCohortes.get_total_steps()
             )
-            current_step = 0
-            resultados = {}
+            self.resultados["produccion"] = AnalisisProduccion(self.page, path).ejecutar_analisis(df, self.update_progress)
+            self.resultados["economico"] = AnalisisEconomico(self.page, path).ejecutar_analisis(df, self.update_progress)
+            self.resultados["clinico"] = AnalisisClinicoGestion(self.page, path).ejecutar_analisis(df, self.update_progress)
+            self.resultados["cohortes"] = AnalisisCohortes(self.page, path).ejecutar_analisis(df, self.update_progress)
+            self.progress_bar.visible = False
+            self.progress_text.visible = False
+            self.zip_buffer = self.crear_zip_en_memoria()
+            self.download_btn.visible = True
+            self.download_btn.disabled = False
+            self.popup.update()
 
-            resultados["exploratorio"] = AnalisisExploratorio(page, archivo_datos).ejecutar_analisis(df, update_progress)
-            resultados["economico"] = AnalisisEconomico(page, archivo_datos).ejecutar_analisis(df, update_progress)
-            resultados["clinico"] = AnalisisClinicoGestion(page, archivo_datos).ejecutar_analisis(df, update_progress)
-            resultados["cohortes"] = AnalisisCohortes(page, archivo_datos).ejecutar_analisis(df, update_progress)
-
-            progress_bar.visible = False
-            progress_text.visible = False
-            download_btn.visible = True
-            popup.update()
         else:
-            error_text.value = "No se seleccionó ningún archivo."
-            error_text.visible = True
-            popup.update()
+            self.error_text.value = "No se seleccionó ningún archivo."
+            self.error_text.visible = True
+            self.popup.update()
 
-    # Inicializar la base de datos
-    db_manager = DatabaseManager()
+    async def on_zip_ready(self, zip_result):
+        self.zip_buffer = zip_result
+        self.download_btn.text = "Descargar Resultados"
+        self.download_btn.disabled = False
+        self.file_picker.on_result = self.guardar_zip
+        self.file_picker.save_file(file_name="resultados.zip")
+        self.popup.update()
 
-    def guardar_zip(event):
-        nonlocal zip_buffer
-
-        if zip_buffer and event.path:
-            try:
-                # Guardar el archivo ZIP en la ruta seleccionada
-                with open(event.path, "wb") as f:
-                    f.write(zip_buffer.getbuffer())
-
-                # Generar nombre del análisis basado en la fecha y hora
-                now = datetime.now()
-                analysis_name = f"Analisis_{now.strftime('%Y-%m-%d_%H-%M-%S')}"
-
-                # Leer el contenido del archivo .zip para guardarlo en la base de datos
-                zip_buffer.seek(0)  # Asegurarse de que el puntero esté al inicio
-                zip_content = zip_buffer.read()
-
-                # Guardar en la base de datos en el hilo principal
-                db_manager.insert_analysis(
-                    usuario_id=user[0],  # Usar el usuario logueado
-                    name=analysis_name,
-                    date=now.strftime('%Y-%m-%d %H:%M:%S'),
-                    file_content=zip_content  # Guardar el contenido del archivo .zip
-                )
-
-                # Mostrar mensaje de éxito
-                snackbar = ft.SnackBar(
-                    content=ft.Text("Análisis guardado correctamente", color=ft.Colors.WHITE),
-                    bgcolor="#4CAF50",  # Color verde para éxito
-                    behavior=ft.SnackBarBehavior.FLOATING,
-                )
-                page.overlay.append(snackbar)
-                snackbar.open = True
-                page.update()
-            except Exception as ex:
-                # Manejar errores al guardar en la base de datos
-                snackbar = ft.SnackBar(
-                    content=ft.Text(f"Error al guardar el archivo: {ex}", color=ft.Colors.WHITE),
-                    bgcolor="#F44336",  # Color rojo para error
-                    behavior=ft.SnackBarBehavior.FLOATING,
-                )
-                page.overlay.append(snackbar)
-                snackbar.open = True
-                page.update()
+    
+    def descargar_resultados(self, e):
+        if self.zip_buffer:
+            self.file_picker.on_result = self.guardar_zip
+            self.file_picker.save_file(file_name="resultados.zip")
         else:
-            # Manejar caso en que no se seleccionó una ruta
             snackbar = ft.SnackBar(
-                content=ft.Text("No se seleccionó ninguna ruta para guardar el archivo.", color=ft.Colors.WHITE),
-                bgcolor="#FFC107",  # Color amarillo para advertencia
+                content=ft.Text("No hay resultados listos para descargar.", color=ft.Colors.WHITE),
+                bgcolor="#FFC107",
                 behavior=ft.SnackBarBehavior.FLOATING,
             )
-            page.overlay.append(snackbar)
+            self.page.overlay.append(snackbar)
             snackbar.open = True
-            page.update()
+            self.page.update()
 
 
-    def descargar_resultados(e):
-        nonlocal zip_buffer
-        zip_buffer = crear_zip_en_memoria(resultados)
-        file_picker.on_result = guardar_zip
-        file_picker.save_file(file_name="resultados.zip")
-        popup.update()
+    def guardar_zip(self, e):
+        if self.zip_buffer and e.path:
+            try:
+                with open(e.path, "wb") as f:
+                    f.write(self.zip_buffer.getbuffer())
+                now = datetime.now()
+                analysis_name = f"Analisis_{now.strftime('%Y-%m-%d_%H-%M-%S')}"
+                self.db_manager.insert_analysis(
+                    usuario_id=self.user[0],
+                    name=analysis_name,
+                    date=now.strftime('%Y-%m-%d %H:%M:%S'),
+                    file_content=self.zip_buffer.read()
+                )
+                snackbar = ft.SnackBar(content=ft.Text("Análisis guardado correctamente", color=ft.Colors.WHITE), bgcolor="#4CAF50", behavior=ft.SnackBarBehavior.FLOATING)
+                self.page.overlay.append(snackbar)
+                snackbar.open = True
+                self.page.update()
+            except Exception as ex:
+                snackbar = ft.SnackBar(content=ft.Text(f"Error al guardar: {ex}", color=ft.Colors.WHITE), bgcolor="#F44336", behavior=ft.SnackBarBehavior.FLOATING)
+                self.page.overlay.append(snackbar)
+                snackbar.open = True
+                self.page.update()
+        else:
+            snackbar = ft.SnackBar(content=ft.Text("No se seleccionó ninguna ruta para guardar.", color=ft.Colors.WHITE), bgcolor="#FFC107", behavior=ft.SnackBarBehavior.FLOATING)
+            self.page.overlay.append(snackbar)
+            snackbar.open = True
+            self.page.update()
 
-    def cerrar_popup(e):
-        resetear_estado()
-        popup.open = False
-        popup.update()
+    def cerrar_popup(self, e):
+        self.resetear_estado()
+        self.popup.open = False
+        self.popup.update()
 
-    file_picker = ft.FilePicker(on_result=ejecutar_analisis)
-    page.overlay.append(file_picker)
-
-    upload_btn = ft.ElevatedButton("Subir Base de Datos", on_click=lambda e: file_picker.pick_files())
-    download_btn.on_click = descargar_resultados
-    close_btn = ft.IconButton(icon=ft.Icons.CLOSE, on_click=cerrar_popup)
-
-    popup = ft.AlertDialog(
-        modal=True,
-        open=False,
-        content=ft.Column([
-            ft.Row([
-                ft.Text("Análisis de Base de Datos", size=20, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
-                close_btn
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            upload_btn,
-            progress_bar,
-            progress_text,
-            error_text,
-            download_btn
-        ],
-            alignment=ft.MainAxisAlignment.CENTER,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            tight=True,
-        ),
-        actions_alignment=ft.MainAxisAlignment.CENTER,
-    )
-
-    return popup, file_picker
+    def get_popup(self):
+        return self.popup

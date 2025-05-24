@@ -12,21 +12,22 @@ class AnalisisCohortes:
 
     def generar_tablas(self, df: pd.DataFrame):
         # Siempre extraer año y mes de la fecha de egreso
-        df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+        df = df.copy()
+        df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
         df = df.dropna(subset=['Fecha de egreso completa'])
-        df['Año'] = df['Fecha de egreso completa'].dt.year
-        df['Mes'] = df['Fecha de egreso completa'].dt.month
+        df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
+        df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
         # Determinar el mes y año más reciente
         max_fecha = df['Fecha de egreso completa'].max()
         max_anio = max_fecha.year
         max_mes = max_fecha.month
         # Filtrar para que todos los años solo lleguen hasta el último mes disponible
-        df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)]
+        df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)].copy()
         resultados = {}
 
         # Definir grupo etario según "Edad en años" con los nuevos rangos
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
-            df['Grupo Etario'] = pd.cut(
+            df.loc[:, 'Grupo Etario'] = pd.cut(
                 df['Edad en años'],
                 bins=[-1, 1, 5, 15, 55, 65, float('inf')],
                 labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
@@ -35,14 +36,15 @@ class AnalisisCohortes:
 
         # Promedio de estancia por grupo etario
         if 'Estancia del Episodio' in df.columns:
-            promedio_estancia = df.groupby('Grupo Etario')['Estancia del Episodio'].mean().reset_index()
+            promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean().reset_index()
             resultados['promedio_estancia_por_grupo_etario'] = promedio_estancia
 
         # Conteo de egresos por mes (usando "Fecha egreso completa")
         if 'Fecha de egreso completa' in df.columns:
-            df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+            df = df.copy()
+            df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
             df = df.dropna(subset=['Fecha de egreso completa'])
-            df['Mes de Egreso'] = df['Fecha de egreso completa'].dt.to_period('M')
+            df.loc[:, 'Mes de Egreso'] = df['Fecha de egreso completa'].dt.to_period('M')
             conteo_egresos = df.groupby('Mes de Egreso', observed=False).size().reset_index(name='Egresos')
             resultados['egresos_por_mes'] = conteo_egresos
 
@@ -50,23 +52,24 @@ class AnalisisCohortes:
 
     def generar_graficos(self, df: pd.DataFrame):
         # Siempre extraer año y mes de la fecha de egreso
-        df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+        df = df.copy()
+        df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
         df = df.dropna(subset=['Fecha de egreso completa'])
-        df['Año'] = df['Fecha de egreso completa'].dt.year
-        df['Mes'] = df['Fecha de egreso completa'].dt.month
+        df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
+        df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
         # Determinar el año y mes más reciente
         max_fecha = df['Fecha de egreso completa'].max()
         max_anio = max_fecha.year
         max_mes = max_fecha.month
         # Filtrar solo los datos del año más reciente y su anterior, hasta el mes máximo
         anios_comparar = [max_anio - 1, max_anio]
-        df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)]
+        df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)].copy()
         resultados = {}
 
         # Heatmap diagnósticos por grupo etario
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
-            df['Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
-            heatmap_data = df.pivot_table(index='Grupo Etario', columns='Diag 01 Principal (cod+des)', aggfunc='size', fill_value=0)
+            df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
+            heatmap_data = df.pivot_table(index='Grupo Etario', columns='Diag 01 Principal (cod+des)', aggfunc='size', fill_value=0, observed=False)
             plt.figure(figsize=(14, 10))
             sns.heatmap(heatmap_data, annot=False, cmap="YlGnBu")
             plt.title('Heatmap de Diagnósticos por Grupo Etario')
@@ -78,10 +81,11 @@ class AnalisisCohortes:
 
         # Línea comparativa de egresos mensuales por año
         if 'Fecha de egreso completa' in df.columns:
-            df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+            df = df.copy()
+            df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
             df = df.dropna(subset=['Fecha de egreso completa'])
-            df['Año'] = df['Fecha de egreso completa'].dt.year
-            df['Mes'] = df['Fecha de egreso completa'].dt.month
+            df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
+            df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
             egresos = df.groupby(['Año', 'Mes']).size().unstack(level=0, fill_value=0)
             fig, ax = plt.subplots(figsize=(12, 6))
             egresos.plot(ax=ax)
@@ -121,8 +125,8 @@ class AnalisisCohortes:
 
         # Barras promedio estancia por grupo etario
         if 'Edad en años' in df.columns and 'Estancia del Episodio' in df.columns:
-            df['Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
-            promedio_estancia = df.groupby('Grupo Etario')['Estancia del Episodio'].mean()
+            df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
+            promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean()
             plt.figure(figsize=(8, 5))
             promedio_estancia.plot(kind='bar', color='skyblue')
             plt.title('Promedio de Estancia por Grupo Etario')

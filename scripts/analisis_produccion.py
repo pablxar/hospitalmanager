@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-class AnalisisExploratorio:
+class AnalisisProduccion:
     def __init__(self, page, nombre_archivo=None):
         self.page = page
         self.nombre_archivo = nombre_archivo
@@ -12,18 +12,20 @@ class AnalisisExploratorio:
     def generar_tablas(self, df: pd.DataFrame):
         resultados = {}
         # Siempre extraer año y mes de la fecha de egreso
+        df = df.copy()  # Evita SettingWithCopyWarning
         df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
         df = df.dropna(subset=['Fecha de egreso completa'])
-        df['Año'] = df['Fecha de egreso completa'].dt.year
-        df['Mes'] = df['Fecha de egreso completa'].dt.month
+        df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
+        df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
         # Determinar el mes y año más reciente
         max_fecha = df['Fecha de egreso completa'].max()
         max_anio = max_fecha.year
         max_mes = max_fecha.month
         # Filtrar para que todos los años solo lleguen hasta el último mes disponible
-        df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)]
+        df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)].copy()
 
-        # Conteo por Motivo Egreso (Descripción) comparativo por año y mes
+
+        
         if 'Motivo Egreso (Descripción)' in df.columns:
             conteo = df_filtrado.groupby(['Año', 'Mes', 'Motivo Egreso (Descripción)']).size().reset_index(name='Frecuencia')
             resultados['conteo_motivo_egreso_por_anio_mes'] = conteo
@@ -47,48 +49,70 @@ class AnalisisExploratorio:
             distribucion_sexo_total.columns = ['Sexo', 'Frecuencia']
             resultados['distribucion_sexo'] = distribucion_sexo_total
 
+        # Tabla comparativa por Hospital de egresos 2024 y 2025: egresos, peso grd medio, estancia media, edad media, y variación porcentual
+        if 'Hospital de Egreso (Descripción)' in df.columns:
+            # Filtrar solo 2024 y 2025 hasta el mes acumulado
+            hospitales_cols = ['Hospital de Egreso (Descripción)', 'Año', 'Mes']
+            extra_cols = []
+            if 'Peso GRD' in df.columns:
+                extra_cols.append('Peso GRD')
+            if 'Estancia' in df.columns:
+                extra_cols.append('Estancia')
+            if 'Edad en años' in df.columns:
+                extra_cols.append('Edad en años')
+            cols = hospitales_cols + extra_cols
+            df_hosp = df_filtrado[df_filtrado['Año'].isin([2024, 2025])][cols].copy()
+            if not df_hosp.empty:
+                # Agrupar y calcular métricas
+                resumen = df_hosp.groupby(['Año', 'Hospital de Egreso (Descripción)']).agg(
+                    egresos=('Hospital de Egreso (Descripción)', 'count'),
+                    peso_grd_medio=('Peso GRD', 'mean') if 'Peso GRD' in df_hosp.columns else ('Hospital de Egreso (Descripción)', 'size'),
+                    estancia_media=('Estancia', 'mean') if 'Estancia' in df_hosp.columns else ('Hospital de Egreso (Descripción)', 'size'),
+                    edad_media=('Edad en años', 'mean') if 'Edad en años' in df_hosp.columns else ('Hospital de Egreso (Descripción)', 'size')
+                ).reset_index()
+                # Separar por año
+                resumen_2024 = resumen[resumen['Año'] == 2024].copy()
+                resumen_2025 = resumen[resumen['Año'] == 2025].copy()
+                # Renombrar columnas para merge
+                resumen_2024 = resumen_2024.rename(columns={
+                    'egresos': 'egresos_2024',
+                    'peso_grd_medio': 'peso_grd_medio_2024',
+                    'estancia_media': 'estancia_media_2024',
+                    'edad_media': 'edad_media_2024'
+                })
+                resumen_2025 = resumen_2025.rename(columns={
+                    'egresos': 'egresos_2025',
+                    'peso_grd_medio': 'peso_grd_medio_2025',
+                    'estancia_media': 'estancia_media_2025',
+                    'edad_media': 'edad_media_2025'
+                })
+                # Unir por hospital
+                comparativo = pd.merge(resumen_2024, resumen_2025, on='Hospital de Egreso (Descripción)', how='outer')
+                # Variación porcentual de egresos
+                comparativo['variacion_egresos_%'] = ((comparativo['egresos_2025'] - comparativo['egresos_2024']) / comparativo['egresos_2024']) * 100
+                resultados['comparativo_hospital_2024_2025'] = comparativo
+                # También guardar tablas individuales
+                resultados['hospitales_2024'] = resumen_2024
+                resultados['hospitales_2025'] = resumen_2025
+
         return resultados
 
     def generar_graficos(self, df: pd.DataFrame):
         resultados = {}
         # Siempre extraer año y mes de la fecha de egreso
+        df = df.copy()  # Evita SettingWithCopyWarning
         df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
         df = df.dropna(subset=['Fecha de egreso completa'])
-        df['Año'] = df['Fecha de egreso completa'].dt.year
-        df['Mes'] = df['Fecha de egreso completa'].dt.month
+        df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
+        df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
         # Determinar el año y mes más reciente
         max_fecha = df['Fecha de egreso completa'].max()
         max_anio = max_fecha.year
         max_mes = max_fecha.month
         # Filtrar solo los datos del año más reciente y su anterior, hasta el mes máximo
         anios_comparar = [max_anio - 1, max_anio]
-        df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)]
+        df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)].copy()
 
-        # Histograma de Edad en años (solo para el año más reciente y anterior, hasta el mes máximo)
-        if 'Edad en años' in df.columns:
-            for anio in anios_comparar:
-                if anio in df_comp['Año'].unique():
-                    fig, ax = plt.subplots()
-                    df_comp[df_comp['Año'] == anio]['Edad en años'].hist(bins=20, ax=ax)
-                    ax.set_title(f'Histograma de Edad - {int(anio)} (hasta mes {max_mes})')
-                    ax.set_xlabel('Edad')
-                    ax.set_ylabel('Frecuencia')
-                    buf = io.BytesIO()
-                    fig.savefig(buf, format='png')
-                    plt.close(fig)
-                    buf.seek(0)
-                    resultados[f'histograma_edad_{int(anio)}.png'] = buf.getvalue()
-            # Histograma total de ambos años
-            fig, ax = plt.subplots()
-            df_comp['Edad en años'].hist(bins=20, ax=ax)
-            ax.set_title(f'Histograma de Edad ({max_anio-1} y {max_anio}, hasta mes {max_mes})')
-            ax.set_xlabel('Edad')
-            ax.set_ylabel('Frecuencia')
-            buf = io.BytesIO()
-            fig.savefig(buf, format='png')
-            plt.close(fig)
-            buf.seek(0)
-            resultados['histograma_edad_comparativo.png'] = buf.getvalue()
 
         # Barras Motivo Egreso (Descripción) comparativo por año y mes (solo año más reciente y anterior, hasta el mes máximo)
         if 'Motivo Egreso (Descripción)' in df.columns:
@@ -134,6 +158,35 @@ class AnalisisExploratorio:
             plt.close(fig)
             buf.seek(0)
             resultados['barras_sexo_comparativo.png'] = buf.getvalue()
+
+        # Gráfico de evolución de egresos hospitalarios: líneas 2024 vs 2025 por hospital (solo hasta el mes máximo acumulado)
+        if 'Hospital de Egreso (Descripción)' in df.columns:
+            # Filtrar solo 2024 y 2025 hasta el mes máximo acumulado
+            df_evo = df[(df['Año'].isin([2024, 2025])) & (df['Mes'] <= max_mes)].copy()
+            hospitales = df_evo['Hospital de Egreso (Descripción)'].unique()
+            for hospital in hospitales:
+                df_hosp = df_evo[df_evo['Hospital de Egreso (Descripción)'] == hospital]
+                if df_hosp.empty:
+                    continue
+                # Crear MultiIndex con todos los meses y años posibles
+                idx = pd.MultiIndex.from_product([[2024, 2025], range(1, max_mes+1)], names=['Año', 'Mes'])
+                pivot = df_hosp.groupby(['Año', 'Mes']).size().reindex(idx, fill_value=0).unstack(0)
+                if pivot.empty:
+                    continue
+                fig, ax = plt.subplots(figsize=(8, 5))
+                pivot.plot(ax=ax, marker='o')
+                ax.set_title(f'Evolución de Egresos - {hospital} (2024 vs 2025, hasta mes {max_mes})')
+                ax.set_xlabel('Mes')
+                ax.set_ylabel('Egresos')
+                ax.set_xticks(range(1, max_mes+1))
+                ax.set_xticklabels(range(1, max_mes+1))
+                ax.legend(title='Año')
+                plt.tight_layout()
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png')
+                plt.close(fig)
+                buf.seek(0)
+                resultados[f'evolucion_egresos_{hospital}.png'] = buf.getvalue()
 
         return resultados
 
