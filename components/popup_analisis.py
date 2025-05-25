@@ -157,7 +157,44 @@ class PopupAnalisisManager:
                 self.indeterminate_bar.visible = True
                 self.popup.update()
                 df = self.verificar_columnas(self.cargar_datos(path))
-                df = df.fillna(method='ffill')
+                df = df.ffill()  # Llenar valores nulos hacia adelante
+
+                # Convertir columna 'Egresos' a numérico
+                df['Egresos'] = pd.to_numeric(df['Egresos'], errors='coerce')
+
+                # Buscar la fila que contiene "Suma Total" en cualquier columna
+                suma_total_row = df[df.apply(lambda row: row.astype(str).str.contains("Suma Total", case=False, na=False)).any(axis=1)]
+
+                if not suma_total_row.empty:
+                    suma_idx = suma_total_row.index[0]
+
+                    # Acceder directamente al valor en la misma fila, columna 'Egresos'
+                    valor_suma_total = df.at[suma_idx, 'Egresos']
+
+                    # Cortar el DataFrame justo antes de esa fila
+                    df = df.loc[:suma_idx - 1]
+
+                    # Calcular total real
+                    total_egresos = df['Egresos'].sum()
+
+                    print(f"📊 Total de pacientes indicado en 'Suma Total': {int(valor_suma_total)}")
+                    print(f"📥 Total de egresos analizados desde la base: {int(total_egresos)}")
+
+                    if int(valor_suma_total) != int(total_egresos):
+                        print("⚠️ ¡CUIDADO! La suma de egresos no coincide con el total declarado.")
+                else:
+                     print("⚠️ No se encontró la fila con 'Suma Total'.")
+
+
+                # Asegurarse de que la fecha esté en datetime
+                df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+                # Si no existe la columna 'Año', crearla vacía
+                if 'Año' not in df.columns:
+                    df['Año'] = pd.NA
+                # Rellenar valores faltantes de 'Año' usando la fecha
+                mascara_sin_anio = df['Año'].isna()
+                df.loc[mascara_sin_anio, 'Año'] = df.loc[mascara_sin_anio, 'Fecha de egreso completa'].dt.year
+
             except Exception as ex:
                 self.error_text.value = str(ex)
                 self.error_text.visible = True

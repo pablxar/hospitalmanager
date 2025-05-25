@@ -178,6 +178,26 @@ class AnalisisProduccion:
                     print(f"❌ Error generando gráfico para {hospital}: {ex}")
         else:
             print("⚠️ Columna 'Hospital de Egreso (Descripción)' no encontrada.")
+        
+        if 'Año' in df.columns and 'Egresos' in df.columns:
+            df_egresos = df[df['Año'].isin([2024, 2025])]
+            egresos_por_año = df_egresos.groupby('Año')['Egresos'].sum()
+            fig, ax = plt.subplots(figsize=(6, 5))
+            bars = ax.bar(egresos_por_año.index.astype(str), egresos_por_año.values, color=['#4CAF50', '#2196F3'])
+            ax.set_title('Egresos Hospitalarios por Año')
+            ax.set_xlabel('Año')
+            ax.set_ylabel('Número de Egresos')
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2, height / 2, f'{int(height):,}', ha='center', va='center', color='white', fontsize=12, weight='bold')
+            buf = io.BytesIO()
+            plt.tight_layout()
+            plt.savefig(buf, format='png')
+            plt.close(fig)
+            buf.seek(0)
+            resultados['barras_egresos_totales_por_año.png'] = buf.getvalue()
+            if update_progress:
+                update_progress()
         return resultados
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
