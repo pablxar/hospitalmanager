@@ -36,7 +36,10 @@ class AnalisisClinicoGestion:
                 update_progress()
         # Frecuencia de diagnósticos por grupo etario
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
-            df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
+            df.loc[:, 'Grupo Etario'] = pd.cut(
+                df['Edad en años'],
+                bins=[-1, 1, 5, 15, 55, 65, float('inf')],
+                labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
             tablas['frecuencia_diagnosticos_por_edad'] = (
                 df.groupby(['Grupo Etario', 'Diag 01 Principal (cod+des)'], observed=False)
                 .size()

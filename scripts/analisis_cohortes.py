@@ -25,7 +25,7 @@ class AnalisisCohortes:
         df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)].copy()
         resultados = {}
 
-        # Definir grupo etario según "Edad en años" con los nuevos rangos
+        # Definir grupo etario según "Edad en años" with the new ranges
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
             df.loc[:, 'Grupo Etario'] = pd.cut(
                 df['Edad en años'],
@@ -71,7 +71,10 @@ class AnalisisCohortes:
 
         # Heatmap diagnósticos por grupo etario
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
-            df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
+            df.loc[:, 'Grupo Etario'] = pd.cut(
+                df['Edad en años'],
+                bins=[-1, 1, 5, 15, 55, 65, float('inf')],
+                labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
             heatmap_data = df.pivot_table(index='Grupo Etario', columns='Diag 01 Principal (cod+des)', aggfunc='size', fill_value=0, observed=False)
             plt.figure(figsize=(14, 10))
             import seaborn as sns
@@ -114,10 +117,14 @@ class AnalisisCohortes:
         egresos = df_comp.groupby(['Mes', 'Año']).size().unstack(level=1, fill_value=0)
         fig, ax = plt.subplots(figsize=(12, 6))
         egresos.plot(ax=ax)
-        ax.set_title(f'Egresos Mensuales {max_anio-1} vs {max_anio} (hasta mes {max_mes})')
+
+        nivel_ideal = 2000
+        ax.axhline(y=nivel_ideal, color='r', linestyle='--', linewidth=2, label='Nivel Ideal')
+        ax.set_title(f'Egresos Mensuales {max_anio-1} vs {max_anio})')
         ax.set_xlabel('Mes')
         ax.set_ylabel('Cantidad de Egresos')
         ax.legend(title='Año')
+        ax.grid(True, linestyle='-.')
         ax.set_xticks(range(1, max_mes+1))
         ax.set_xticklabels([
             'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
@@ -132,8 +139,19 @@ class AnalisisCohortes:
             update_progress()
         # Barras promedio estancia por grupo etario
         if 'Edad en años' in df.columns and 'Estancia del Episodio' in df.columns:
-            df.loc[:, 'Grupo Etario'] = pd.cut(df['Edad en años'], bins=[0, 18, 59, 120], labels=["0-18", "19-59", "60+"])
-            promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean()
+            # Crear categorías ordenadas para grupos etarios
+            grupos_etarios = pd.CategoricalDtype(categories=["0-18", "19-59", "60+"], ordered=True)
+            
+            # Asignar grupos etarios usando pd.cut con dtype explícito
+            df.loc[:, 'Grupo Etario'] = pd.cut(
+                df['Edad en años'], 
+                bins=[0, 18, 59, 120], 
+                labels=["0-18", "19-59", "60+"],
+                ordered=True
+            ).astype(grupos_etarios)
+            
+            # Resto del código
+            promedio_estancia = df.groupby('Grupo Etario', observed=True)['Estancia del Episodio'].mean()
             plt.figure(figsize=(8, 5))
             promedio_estancia.plot(kind='bar', color='skyblue')
             plt.title('Promedio de Estancia por Grupo Etario')
