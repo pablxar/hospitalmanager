@@ -17,12 +17,16 @@ class AnalisisProduccion:
         df = df.dropna(subset=['Fecha de egreso completa'])
         df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year #AÑO SIN DECIMALES
         df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
+                # Asegurar que el año sea un entero en todas las tablas y gráficos
+        if 'Año' in df.columns:
+            df['Año'] = df['Año'].astype(int)
         max_fecha = df['Fecha de egreso completa'].max()
         max_anio = max_fecha.year
         max_mes = max_fecha.month
         df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)].copy()
         if 'Motivo Egreso (Descripción)' in df.columns:
             conteo = df_filtrado.groupby(['Año', 'Mes', 'Motivo Egreso (Descripción)']).size().reset_index(name='Frecuencia')
+            
             resultados['conteo_motivo_egreso_por_anio_mes'] = conteo
             conteo_total = df_filtrado['Motivo Egreso (Descripción)'].value_counts().reset_index()
             conteo_total.columns = ['Motivo Egreso', 'Frecuencia']
@@ -102,6 +106,10 @@ class AnalisisProduccion:
         df = df.dropna(subset=['Fecha de egreso completa'])
         df['Año'] = df['Fecha de egreso completa'].dt.year
         df['Mes'] = df['Fecha de egreso completa'].dt.month
+
+        # Asegurar que el año sea un entero en todas las tablas y gráficos
+        if 'Año' in df.columns:
+            df['Año'] = df['Año'].astype(int)
 
         # Validación de datos
         if df.empty:
@@ -363,6 +371,12 @@ class AnalisisProduccion:
         resultados = {}
         resultados['tablas'] = self.generar_tablas(df, update_progress)
         resultados['graficos'] = self.generar_graficos(df, update_progress)
+        
+        # Convertir el año a entero en todas las tablas generadas
+        for key, table in resultados.items():
+            if isinstance(table, pd.DataFrame) and 'Año' in table.columns:
+                table['Año'] = table['Año'].astype(int)
+        
         return resultados
 
     @staticmethod

@@ -11,33 +11,23 @@ class AnalisisCohortes:
         self.nombre_archivo = nombre_archivo
 
     def generar_tablas(self, df: pd.DataFrame, update_progress=None):
-        # Siempre extraer año y mes de la fecha de egreso
+        resultados = {}
         df = df.copy()
-        df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+        df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
         df = df.dropna(subset=['Fecha de egreso completa'])
-        df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
+        df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year #AÑO SIN DECIMALES
         df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
-        # Determinar el mes y año más reciente
+                # Asegurar que el año sea un entero en todas las tablas y gráficos
+        if 'Año' in df.columns:
+            df['Año'] = df['Año'].astype(int)
         max_fecha = df['Fecha de egreso completa'].max()
         max_anio = max_fecha.year
         max_mes = max_fecha.month
-        # Filtrar para que todos los años solo lleguen hasta el último mes disponible
         df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)].copy()
-        resultados = {}
 
-        # Definir grupo etario según "Edad en años" with the new ranges
-        if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
-            df.loc[:, 'Grupo Etario'] = pd.cut(
-                df['Edad en años'],
-                bins=[-1, 1, 5, 15, 55, 65, float('inf')],
-                labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
-            tabla_diagnosticos = df.groupby(['Grupo Etario', 'Diag 01 Principal (cod+des)'], observed=False).size().unstack(fill_value=0)
-            resultados['diagnosticos_por_grupo_etario'] = tabla_diagnosticos
-            if update_progress:
-                update_progress()
         # Promedio de estancia por grupo etario
         if 'Estancia del Episodio' in df.columns:
-            promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean().reset_index()
+            promedio_estancia = df.groupby('Edad en años', observed=False)['Estancia del Episodio'].mean().reset_index()
             resultados['promedio_estancia_por_grupo_etario'] = promedio_estancia
             if update_progress:
                 update_progress()
@@ -54,20 +44,31 @@ class AnalisisCohortes:
         return resultados
 
     def generar_graficos(self, df: pd.DataFrame, update_progress=None):
-        # Siempre extraer año y mes de la fecha de egreso
+        resultados = {}
+        
+        # Definir colores constantes para los años
+        COLOR_2024 = '#4CAF50'  # Verde
+        COLOR_2025 = '#2196F3'  # Azul
+        
         df = df.copy()
-        df.loc[:, 'Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
+        # Procesar fechas
+        df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
         df = df.dropna(subset=['Fecha de egreso completa'])
-        df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
-        df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
-        # Determinar el año y mes más reciente
+        df['Año'] = df['Fecha de egreso completa'].dt.year
+        df['Mes'] = df['Fecha de egreso completa'].dt.month
+
+        # Validación de datos
+        if df.empty:
+            print("⚠️ El DataFrame está vacío luego del procesamiento de fechas.")
+            return resultados
+
+        # Limitar al rango de comparación acumulado (hasta el mes más reciente del último año)
         max_fecha = df['Fecha de egreso completa'].max()
         max_anio = max_fecha.year
         max_mes = max_fecha.month
-        # Filtrar solo los datos del año más reciente y su anterior, hasta el mes máximo
         anios_comparar = [max_anio - 1, max_anio]
+
         df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)].copy()
-        resultados = {}
 
         # Heatmap diagnósticos por grupo etario
         if 'Edad en años' in df.columns and 'Diag 01 Principal (cod+des)' in df.columns:
@@ -139,29 +140,29 @@ class AnalisisCohortes:
             update_progress()
         # Barras promedio estancia por grupo etario
         if 'Edad en años' in df.columns and 'Estancia del Episodio' in df.columns:
-            # Crear categorías ordenadas para grupos etarios
-            grupos_etarios = pd.CategoricalDtype(categories=["0-18", "19-59", "60+"], ordered=True)
-            
-            # Asignar grupos etarios usando pd.cut con dtype explícito
+            # Asignar grupos etarios usando pd.cut con los nuevos rangos
             df.loc[:, 'Grupo Etario'] = pd.cut(
                 df['Edad en años'], 
-                bins=[0, 18, 59, 120], 
-                labels=["0-18", "19-59", "60+"],
-                ordered=True
-            ).astype(grupos_etarios)
-            
-            # Resto del código
-            promedio_estancia = df.groupby('Grupo Etario', observed=True)['Estancia del Episodio'].mean()
+                bins=[-1, 1, 5, 15, 55, 65, float('inf')], 
+                labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
+
+            # Calcular el promedio de estancia por grupo etario
+            promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean()
+
+            # Crear el gráfico de barras
             plt.figure(figsize=(8, 5))
             promedio_estancia.plot(kind='bar', color='skyblue')
             plt.title('Promedio de Estancia por Grupo Etario')
             plt.xlabel('Grupo Etario')
             plt.ylabel('Estancia Promedio')
+
+            # Guardar el gráfico en un buffer
             buffer = io.BytesIO()
             plt.savefig(buffer, format='png')
             buffer.seek(0)
             resultados['barras_promedio_estancia.png'] = buffer.getvalue()
             plt.close()
+
             if update_progress:
                 update_progress()
         return resultados
@@ -173,4 +174,4 @@ class AnalisisCohortes:
 
     @staticmethod
     def get_total_steps():
-        return 6
+        return 5

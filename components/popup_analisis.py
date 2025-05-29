@@ -60,7 +60,7 @@ class PopupAnalisisManager:
         )
 
         self.download_btn.on_click = self.descargar_resultados
-
+    
     def crear_zip_en_memoria(self):
         zip_buffer = io.BytesIO()
         with ZipFile(zip_buffer, "w") as zip_file:
@@ -69,15 +69,27 @@ class PopupAnalisisManager:
                 if 'estadisticas' in resultados and isinstance(resultados['estadisticas'], pd.DataFrame):
                     tablas = {'estadisticas': resultados['estadisticas']}
                 for nombre_tabla, df in tablas.items():
-                    df = df.map(lambda x: f"{x:.4f}" if isinstance(x, (int, float)) else x)
-                    ncols = len(df.columns)
-                    nrows = len(df)
+                    # Aquí aplicamos formato sólo a columnas float con decimales
+                    df_formateado = df.copy()
+                    for col in df_formateado.columns:
+                        if pd.api.types.is_float_dtype(df_formateado[col]):
+                            # Redondear a 2 decimales
+                            df_formateado[col] = df_formateado[col].round(2)
+                        elif pd.api.types.is_integer_dtype(df_formateado[col]):
+                            # Convertir a int para evitar decimales en enteros
+                            df_formateado[col] = df_formateado[col].astype(int)
+                        # Puedes agregar más reglas si quieres formatear strings o fechas
+                    # Ahora sí pasamos a string para guardarlo en la tabla de matplotlib
+                    df_str = df_formateado.astype(str)
+
+                    ncols = len(df_str.columns)
+                    nrows = len(df_str)
                     fig_width = max(14, ncols * 1.2)
                     fig_height = max(1, min(0.7 * nrows, 40))
                     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
                     ax.axis('off')
                     col_colors = ['#4CAF50'] * ncols
-                    table = ax.table(cellText=df.values, colLabels=df.columns, loc='center', cellLoc='center', colColours=col_colors)
+                    table = ax.table(cellText=df_str.values, colLabels=df_str.columns, loc='center', cellLoc='center', colColours=col_colors)
                     for (row, col), cell in table.get_celld().items():
                         cell.set_linewidth(0.5)
                         if row == 0:
