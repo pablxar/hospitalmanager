@@ -110,7 +110,10 @@ class PopupAnalisisManager:
                     img_buffer.seek(0)
                     zip_file.writestr(f"{nombre_analisis}/tablas/{nombre_tabla}.png", img_buffer.getvalue())
                 for nombre_img, img_bytes in resultados.get('graficos', {}).items():
-                    zip_file.writestr(f"{nombre_analisis}/graficos/{nombre_img}", img_bytes)
+                    if isinstance(img_bytes, bytes):
+                        zip_file.writestr(f"{nombre_analisis}/graficos/{nombre_img}", img_bytes)
+                    else:
+                        raise TypeError(f"Expected binary data for {nombre_img}, but got {type(img_bytes)}")
         zip_buffer.seek(0)
         return zip_buffer
 

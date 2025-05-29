@@ -25,12 +25,20 @@ class AnalisisCohortes:
         max_mes = max_fecha.month
         df_filtrado = df[(df['Mes'] <= max_mes) | (df['Año'] < max_anio)].copy()
 
-        # Promedio de estancia por grupo etario
+       # Promedio de estancia por grupo etario
         if 'Estancia del Episodio' in df.columns:
-            promedio_estancia = df.groupby('Edad en años', observed=False)['Estancia del Episodio'].mean().reset_index()
-            resultados['promedio_estancia_por_grupo_etario'] = promedio_estancia
-            if update_progress:
-                update_progress()
+            # Asignar grupos etarios usando pd.cut con los rangos especificados
+            df.loc[:, 'Grupo Etario'] = pd.cut(
+                df['Edad en años'], 
+                bins=[-1, 1, 5, 15, 55, 65, float('inf')], 
+                labels=["-1", "1-4", "5-14", "15-54", "55-64", "65+"])
+
+            # Calcular el promedio de estancia por grupo etario
+            if 'Grupo Etario' in df.columns and 'Estancia del Episodio' in df.columns:
+                promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean().reset_index()
+                resultados['promedio_estancia_por_grupo_etario'] = promedio_estancia
+                if update_progress:
+                    update_progress()
         # Conteo de egresos por mes (usando "Fecha egreso completa")
         if 'Fecha de egreso completa' in df.columns:
             df = df.copy()
@@ -56,6 +64,7 @@ class AnalisisCohortes:
         df = df.dropna(subset=['Fecha de egreso completa'])
         df['Año'] = df['Fecha de egreso completa'].dt.year
         df['Mes'] = df['Fecha de egreso completa'].dt.month
+
 
         # Validación de datos
         if df.empty:
@@ -148,6 +157,7 @@ class AnalisisCohortes:
 
             # Calcular el promedio de estancia por grupo etario
             promedio_estancia = df.groupby('Grupo Etario', observed=False)['Estancia del Episodio'].mean()
+            
 
             # Crear el gráfico de barras
             plt.figure(figsize=(8, 5))
