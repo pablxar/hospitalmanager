@@ -79,7 +79,7 @@ class AnalisisProduccion:
                 # Hacer el merge por Hospital
                 comparativo = pd.merge(resumen_2024, resumen_2025, on='Hospital', how='outer')
                 
-                # Llenar NaN con 0 para evitar errores en el cálculo
+                # Llenar NaN with 0 para evitar errores en el cálculo
                 for col in ['egresos_2024', 'egresos_2025']:
                     comparativo[col] = comparativo[col].fillna(0)
                 
@@ -123,41 +123,49 @@ class AnalisisProduccion:
         anios_comparar = [max_anio - 1, max_anio]
 
         df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)].copy()
+        # Mapeo de nombres de hospitales a abreviaturas
+        mapeo_hospitales = {
+            'Hospital Carlos Van Buren (Valparaíso)': 'HCVB',
+            'Hospital Claudio Vicuña ( San Antonio)': 'HCV',
+            'Hospital Dr. Eduardo Pereira Ramírez (Valparaíso)': 'HEP'
+        }
         
         
         if 'Motivo Egreso (Descripción)' in df.columns:
             pivot = df_comp.pivot_table(index='Motivo Egreso (Descripción)', columns='Año', aggfunc='size', fill_value=0)
             fig, ax = plt.subplots(figsize=(10, 6))
-            
-            # Crear barras con los colores específicos
-            bar_width = 0.35
-            x = np.arange(len(pivot.index))
-            
-            # Asegurarse de que las columnas existan, si no, usar ceros
+
+            # Crear barras horizontales con los colores específicos
+            bar_height = 0.35
+            y = np.arange(len(pivot.index))
+
             datos_2024 = pivot[2024] if 2024 in pivot.columns else pd.Series(0, index=pivot.index)
             datos_2025 = pivot[2025] if 2025 in pivot.columns else pd.Series(0, index=pivot.index)
-            
-            bars1 = ax.bar(x - bar_width/2, datos_2024, bar_width, label='2024', color=COLOR_2024)
-            bars2 = ax.bar(x + bar_width/2, datos_2025, bar_width, label='2025', color=COLOR_2025)
-            
-            ax.set_title(f'Frecuencia por Motivo de Egreso ({max_anio-1} vs {max_anio}, hasta mes {max_mes})')
-            ax.set_xlabel('Motivo de Egreso')
-            ax.set_ylabel('Frecuencia')
-            ax.set_xticks(x)
-            ax.set_xticklabels(pivot.index, rotation=45, ha='right')
+
+            bars1 = ax.barh(y - bar_height/2, datos_2024, bar_height, label='2024', color=COLOR_2024)
+            bars2 = ax.barh(y + bar_height/2, datos_2025, bar_height, label='2025', color=COLOR_2025)
+
+            ax.set_title(f'Frecuencia por Motivo de Egreso ({max_anio-1} vs {max_anio})')
+            ax.set_ylabel('Motivo de Egreso')
+            ax.set_xlabel('Cantidad de Egresos')
+            ax.set_yticks(y)
+            ax.set_yticklabels(pivot.index, rotation=0, ha='right')
             ax.legend(title='Año')
-            
+
+            # Llamar a la función modular para configurar el gráfico
+            configurar_grafico(ax)
+
             # Añadir etiquetas en las barras
-            def autolabel(bars):
+            def autolabel_horizontal(bars):
                 for bar in bars:
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2, height,
-                           f'{int(height):,}',
-                           ha='center', va='bottom', rotation=0)
-            
-            autolabel(bars1)
-            autolabel(bars2)
-            
+                    width = bar.get_width()
+                    ax.text(width, bar.get_y() + bar.get_height()/2,
+                            f'{int(width):,}',
+                            ha='left', va='center', rotation=0)
+
+            autolabel_horizontal(bars1)
+            autolabel_horizontal(bars2)
+
             plt.tight_layout()
             buf = io.BytesIO()
             plt.savefig(buf, format='png', bbox_inches='tight')
@@ -181,12 +189,15 @@ class AnalisisProduccion:
             bars1 = ax.bar(x - bar_width/2, datos_2024, bar_width, label='2024', color=COLOR_2024)
             bars2 = ax.bar(x + bar_width/2, datos_2025, bar_width, label='2025', color=COLOR_2025)
             
-            ax.set_title(f'Distribución por Tipo de Ingreso ({max_anio-1} vs {max_anio}, hasta mes {max_mes})')
+            ax.set_title(f'Distribución por Tipo de Ingreso de la Red ({max_anio-1} vs {max_anio})')
             ax.set_xlabel('Tipo de Ingreso')
-            ax.set_ylabel('Frecuencia')
+            ax.set_ylabel('Cantidad de Egresos')
             ax.set_xticks(x)
-            ax.set_xticklabels(pivot.index, rotation=45, ha='right')
+            ax.set_xticklabels(pivot.index, rotation=0, ha='right')
             ax.legend(title='Año')
+            
+            # Llamar a la función modular para configurar el gráfico
+            configurar_grafico(ax)
             
             # Añadir etiquetas en las barras
             def autolabel(bars):
@@ -223,12 +234,15 @@ class AnalisisProduccion:
             bars1 = ax.bar(x - bar_width/2, datos_2024, bar_width, label='2024', color=COLOR_2024)
             bars2 = ax.bar(x + bar_width/2, datos_2025, bar_width, label='2025', color=COLOR_2025)
             
-            ax.set_title(f'Distribución por Sexo ({max_anio-1} vs {max_anio}, hasta mes {max_mes})')
+            ax.set_title(f'Distribución por Sexo ({max_anio-1} vs {max_anio})')
             ax.set_xlabel('Sexo')
-            ax.set_ylabel('Frecuencia')
+            ax.set_ylabel('Cantidad de Egresos')
             ax.set_xticks(x)
             ax.set_xticklabels(pivot.index, rotation=0, ha='center')
             ax.legend(title='Año')
+            
+            # Llamar a la función modular para configurar el gráfico
+            configurar_grafico(ax)
             
             # Añadir etiquetas en las barras
             def autolabel(bars):
@@ -254,6 +268,7 @@ class AnalisisProduccion:
             hospitales = df_evo['Hospital (Descripción)'].dropna().unique()
             for hospital in hospitales:
                 try:
+                    hospital_abreviado = mapeo_hospitales.get(hospital, hospital)
                     df_hosp = df_evo[df_evo['Hospital (Descripción)'] == hospital]
                     idx = pd.MultiIndex.from_product([[max_anio - 1, max_anio], range(1, max_mes + 1)], names=['Año', 'Mes'])
                     pivot = df_hosp.groupby(['Año', 'Mes']).size().reindex(idx, fill_value=0).unstack(0)
@@ -263,7 +278,7 @@ class AnalisisProduccion:
                     linea_2024 = ax.plot(pivot.index, pivot[2024], marker='o', color=COLOR_2024, label='2024')
                     linea_2025 = ax.plot(pivot.index, pivot[2025], marker='o', color=COLOR_2025, label='2025')
                     
-                    ax.set_title(f'Evolución de Egresos - {hospital} ({max_anio-1} vs {max_anio}, hasta mes {max_mes})')
+                    ax.set_title(f'Evolución de Egresos - {hospital_abreviado} ({max_anio-1} vs {max_anio})')
                     ax.set_xlabel('Mes')
                     ax.set_ylabel('Egresos')
                     ax.set_xticks(range(1, max_mes + 1))
@@ -272,13 +287,15 @@ class AnalisisProduccion:
                         'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
                     ][:max_mes])
                     ax.legend(title='Año')
+                    # Llamar a la función modular para configurar el gráfico
+                    configurar_grafico(ax)
                     plt.tight_layout()
                     buf = io.BytesIO()
                     plt.savefig(buf, format='png', bbox_inches='tight')
                     plt.close(fig)
                     buf.seek(0)
 
-                    resultados[f'evolucion_egresos_{hospital}.png'] = buf.getvalue()
+                    resultados[f'evolucion_egresos_{hospital_abreviado}.png'] = buf.getvalue()
                     print(f"✅ Gráfico generado para hospital: {hospital}")
                     if update_progress:
                         update_progress()
@@ -288,15 +305,8 @@ class AnalisisProduccion:
             print("⚠️ Columna 'Hospital de Egreso (Descripción)' no encontrada.")
 
         if 'Año' in df.columns and 'Hospital (Descripción)' in df.columns:
-            # Mapeo de nombres de hospitales a abreviaturas
-            mapeo_hospitales = {
-                'Hospital Carlos Van Buren (Valparaíso)': 'HCVB',
-                'Hospital Claudio Vicuña ( San Antonio)': 'HCV',
-                'Hospital Dr. Eduardo Pereira Ramírez (Valparaíso)': 'HEP'
-            }
-            
             df_egresos = df[df['Año'].isin([2024, 2025])].copy()
-            # Aplicar el mapeo de abreviaturas
+            # Aplicar el mapeo de abreviaturas usando el diccionario completo
             df_egresos['Hospital (Descripción)'] = df_egresos['Hospital (Descripción)'].map(mapeo_hospitales)
             
             # Agrupar por año y hospital
@@ -339,12 +349,15 @@ class AnalisisProduccion:
             bars1 = ax.bar(x - bar_width/2, datos_2024, bar_width, label='2024', color=COLOR_2024)
             bars2 = ax.bar(x + bar_width/2, datos_2025, bar_width, label='2025', color=COLOR_2025)
             
-            ax.set_title(f'Egresos Hospitalarios por Hospital y Año hasta mes {max_mes}')
+            ax.set_title(f'Egresos Hospitalarios por Hospital y Año')
             ax.set_xlabel('Hospital')
-            ax.set_ylabel('Número de Egresos')
+            ax.set_ylabel('Cantidad de Egresos')
             ax.set_xticks(x)
             ax.set_xticklabels(orden_hospitales, rotation=0, ha='center')
-            ax.legend()
+            ax.legend(title='Año')
+            
+            # Llamar a la función modular para configurar el gráfico
+            configurar_grafico(ax)
             
             # Añadir etiquetas en las barras
             def autolabel(bars):
@@ -382,3 +395,9 @@ class AnalisisProduccion:
     @staticmethod
     def get_total_steps():
         return 12
+
+def configurar_grafico(ax):
+    """
+    Configura aspectos comunes de los gráficos, como el grid.
+    """
+    ax.grid(True)
