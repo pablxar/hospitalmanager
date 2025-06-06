@@ -97,9 +97,62 @@ class AnalisisClinicoGestion:
             plt.close(fig)
             buf.seek(0)
             resultados['scatter_peso_vs_estancia.png'] = buf.getvalue()
+
+            if update_progress:
+                update_progress()
+        
+        # Gráfico comparativo de egresos mensuales con nivel de intervención quirúrgica
+        if 'Egresos' in df.columns and '(S/N) Egreso Quirúrgico' in df.columns:
+            
+            # Colores definidos para las actividades
+            COLOR_EGRESOS = "#2196F3"  # Azul para egresos generales
+            COLOR_QUIRURGICOS = "#FF5722"  # Naranja para egresos quirúrgicos
+
+            # Crear una tabla pivotante para contar los egresos (pacientes) por mes
+            pivot = df_comp.pivot_table(index='Mes', columns='Tipo Actividad', values='Egresos', aggfunc='count', fill_value=0)
+
+            # Calcular la variación porcentual de los egresos (frecuencia de pacientes)
+            variacion_porcentual = pivot.pct_change().fillna(0) * 100
+
+            fig, ax1 = plt.subplots(figsize=(10, 6))
+
+            # Barras para 'Egresos' generales
+            ax1.bar(pivot.index, pivot['Hospitalización'], label='Egresos Generales', color=COLOR_EGRESOS, alpha=0.6)
+
+            # Añadir una segunda escala de eje para la línea de variación porcentual
+            ax2 = ax1.twinx()
+            ax2.plot(variacion_porcentual.index, variacion_porcentual['Hospitalización'], marker='o', linestyle='--', color=COLOR_QUIRURGICOS, label='Variación % Egresos Quirúrgicos')
+
+            # Títulos y etiquetas
+            ax1.set_title('Comparativo de Egresos Mensuales con Nivel de Intervención Quirúrgica')
+            ax1.set_xlabel('Mes')
+            ax1.set_ylabel('Cantidad de Egresos', color=COLOR_EGRESOS)
+            ax1.set_xticks(range(1, len(pivot.index) + 1))
+            ax1.set_xticklabels(['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][:len(pivot.index)])
+            ax1.tick_params(axis='y', labelcolor=COLOR_EGRESOS)
+
+            ax2.set_ylabel('Variación %', color=COLOR_QUIRURGICOS)
+            ax2.tick_params(axis='y', labelcolor=COLOR_QUIRURGICOS)
+
+            # Añadir leyenda
+            fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.9), bbox_transform=ax1.transAxes)
+
+            # Ajustar la disposición del gráfico
+            plt.tight_layout()
+
+            # Guardar el gráfico en un buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', bbox_inches='tight')
+            plt.close(fig)
+            buf.seek(0)
+
+            # Guardar el gráfico como imagen en el diccionario de resultados
+            resultados['grafico_egresos_comparativo_mejorado.png'] = buf.getvalue()
             if update_progress:
                 update_progress()
         return resultados
+
+        
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
         resultados = {}

@@ -100,6 +100,12 @@ class AnalisisProduccion:
         COLOR_2024 = '#4CAF50'  # Verde
         COLOR_2025 = '#2196F3'  # Azul
         
+        # Colores definidos para las actividades
+        COLOR_CMA = "#CE79FF"
+        COLOR_HOSPITALIZACION = "#FAD155"
+        
+        COLOR_VARIACION = "#FF5733"  # Rojo para variación porcentual
+        
         df = df.copy()
         # Procesar fechas
         df['Fecha de egreso completa'] = pd.to_datetime(df['Fecha de egreso completa'], errors='coerce')
@@ -378,6 +384,109 @@ class AnalisisProduccion:
             resultados['barras_egresos_por_hospital_y_año.png'] = buf.getvalue()
             if update_progress:
                 update_progress()
+        if 'Hospital (Descripción)' in df.columns and 'Tipo Actividad' in df.columns:
+            df_cma = df[(df['Tipo Actividad'] == 'Cirugía Mayor Ambulatoria (CMA)') & (df['Año'].isin([max_anio - 1, max_anio])) & (df['Mes'] <= max_mes)].copy()
+            hospitales = df_cma['Hospital (Descripción)'].dropna().unique()
+            for hospital in hospitales:
+                try:
+                    hospital_abreviado = mapeo_hospitales.get(hospital, hospital)
+                    df_hosp = df_cma[df_cma['Hospital (Descripción)'] == hospital]
+                    idx = pd.MultiIndex.from_product([[max_anio - 1, max_anio], range(1, max_mes + 1)], names=['Año', 'Mes'])
+                    pivot = df_hosp.groupby(['Año', 'Mes']).size().reindex(idx, fill_value=0).unstack(0)
+                    fig, ax = plt.subplots(figsize=(8, 5))
+
+                    # Usar los colores constantes para las líneas
+                    linea_2024 = ax.plot(pivot.index, pivot[2024], marker='o', color=COLOR_2024, label='2024')
+                    linea_2025 = ax.plot(pivot.index, pivot[2025], marker='o', color=COLOR_2025, label='2025')
+
+                    ax.set_title(f'Evolución de Egresos - {hospital_abreviado} (CMA)')
+                    ax.set_xlabel('Mes')
+                    ax.set_ylabel('Egresos')
+                    ax.set_xticks(range(1, max_mes + 1))
+                    ax.set_xticklabels([
+                        'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+                    ][:max_mes])
+                    ax.legend(title='Año')
+                    # Llamar a la función modular para configurar el gráfico
+                    configurar_grafico(ax)
+                    plt.tight_layout()
+                    buf = io.BytesIO()
+                    plt.savefig(buf, format='png', bbox_inches='tight')
+                    plt.close(fig)
+                    buf.seek(0)
+
+                    resultados[f'evolucion_egresos_cma_{hospital_abreviado}.png'] = buf.getvalue()
+                    print(f"✅ Gráfico generado para hospital (CMA): {hospital}")
+                    if update_progress:
+                        update_progress()
+                except Exception as ex:
+                    print(f"❌ Error generando gráfico para {hospital} (CMA): {ex}")
+        
+
+        # Asegurarse de que 'Tipo Actividad' esté en el DataFrame
+        if 'Tipo Actividad' in df.columns:
+            
+            # Crear una tabla pivotante para contar los egresos (pacientes) por tipo de actividad y mes
+            pivot = df_comp.pivot_table(index='Mes', columns='Tipo Actividad', values='Egresos', aggfunc='count', fill_value=0)
+            
+            # Calcular la variación porcentual de los egresos (frecuencia de pacientes)
+            variacion_porcentual = pivot.pct_change().fillna(0) * 100
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+
+            # Ajustes para barras agrupadas
+            bar_width = 0.35
+            index = np.arange(len(pivot.index))
+
+            # Barras para 'Cirugía Mayor Ambulatoria (CMA)'
+            if 'Cirugía Mayor Ambulatoria (CMA)' in pivot.columns:
+                ax.bar(index, pivot['Cirugía Mayor Ambulatoria (CMA)'], bar_width, label='CMA', color=COLOR_CMA)
+
+            # Barras para 'Hospitalización'
+            if 'Hospitalización' in pivot.columns:
+                ax.bar(index + bar_width, pivot['Hospitalización'], bar_width, label='Hospitalización', color=COLOR_HOSPITALIZACION)
+
+            # Añadir líneas de variación porcentual
+            for tipo, color in zip(['Cirugía Mayor Ambulatoria (CMA)', 'Hospitalización'], [COLOR_VARIACION, COLOR_VARIACION]):
+                if tipo in variacion_porcentual.columns:
+                    # Obtener las alturas de las barras correspondientes
+                    alturas_barras = pivot[tipo].values
+                    # Ajustar las líneas para que comiencen desde el máximo de las barras
+                    ax.plot(index + (bar_width if tipo == 'Hospitalización' else 0), alturas_barras + variacion_porcentual[tipo].values, 
+                            marker='o', linestyle='-', color=color, label=f'Variación % {tipo}')
+
+            # Títulos y etiquetas
+            ax.set_title('Producción Mensual por Tipo de Actividad y Variación Porcentual')
+            ax.set_xlabel('Mes')
+            ax.set_ylabel('Frecuencia de Egresos')
+            ax.set_xticks(index + bar_width / 2)
+            ax.set_xticklabels([
+                'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+            ][:len(pivot.index)])
+            ax.legend(title='Indicadores')
+
+            # Configuración modular para mejorar visualización
+            configurar_grafico(ax)
+
+            # Ajustar la disposición del gráfico para que no se solapen elementos
+            plt.tight_layout()
+
+            # Guardar el gráfico en un buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', bbox_inches='tight')
+            plt.close(fig)
+            buf.seek(0)
+
+            # Guardar el gráfico como imagen en el diccionario de resultados
+            resultados['barras_agrupadas_variacion_con_linea.png'] = buf.getvalue()
+            print("✅ Gráfico de barras agrupadas con variación porcentual generado.")
+            
+            # Actualización del progreso
+            if update_progress:
+                update_progress()
+
         return resultados
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
@@ -394,7 +503,8 @@ class AnalisisProduccion:
 
     @staticmethod
     def get_total_steps():
-        return 12
+        return 16
+        
 
 def configurar_grafico(ax):
     """

@@ -146,7 +146,7 @@ class PopupAnalisisManager:
             "Sexo (Desc)", "Comuna de residencia ( Desc )", "Fecha ingreso completa", "(SI/NO) VMI", "Motivo Egreso (Descripción)",
             "Prevision (Desc)", "Hospital de procedencia (Des )", "Estancia del Episodio", "(Sí/No) Cancer-Neoplasias",
             "Tipo Ingreso (Descripción)", "Nivel de severidad (Descripción)", "(S/N) Egreso Quirúrgico", "(Si/No) Cesáreas", "Peso GRD",
-            "CDM (Descripción)", "Mes egreso (Descripción)", "Edad en años", "Diag 01 Principal (cod+des)", "Estancias [Norma]", "Egresos"
+            "CDM (Descripción)", "Mes egreso (Descripción)", "Edad en años", "Diag 01 Principal (cod+des)", "Estancias [Norma]", "Tipo Actividad","Egresos"
         ]
         faltantes = [col for col in columnas_requeridas if col not in df.columns]
         if faltantes:
