@@ -105,9 +105,19 @@ class AnalisisCohortes:
             df.loc[:, 'Año'] = df['Fecha de egreso completa'].dt.year
             df.loc[:, 'Mes'] = df['Fecha de egreso completa'].dt.month
             egresos = df.groupby(['Año', 'Mes']).size().unstack(level=0, fill_value=0)
+
+            # Calcular la variación porcentual mes a mes
+            variacion_porcentual = egresos.pct_change().fillna(0) * 100
+
             fig, ax = plt.subplots(figsize=(12, 6))
             egresos.plot(ax=ax)
-            ax.set_title('Egresos Mensuales Comparativos por Año')
+
+            # Añadir marcas para la variación porcentual
+            for year, color in zip(egresos.columns, ['#4CAF50', '#2196F3']):
+                if year in variacion_porcentual.columns:
+                    ax.scatter(egresos.index, egresos[year] + variacion_porcentual[year], color=color, alpha=0.6, label=f'Variación % {year}')
+
+            ax.set_title('Egresos Mensuales Comparativos por Año con Variación Porcentual')
             ax.set_xlabel('Mes')
             ax.set_ylabel('Cantidad de Egresos')
             ax.legend(title='Año')
@@ -120,17 +130,28 @@ class AnalisisCohortes:
             fig.savefig(buf, format='png')
             plt.close(fig)
             buf.seek(0)
-            resultados['linea_egresos_mensuales_comparativo.png'] = buf.getvalue()
+            resultados['linea_egresos_mensuales_comparativo2.png'] = buf.getvalue()
             if update_progress:
                 update_progress()
+
         # Línea comparativa de egresos mensuales por año (solo año más reciente y anterior, hasta el mes máximo)
         egresos = df_comp.groupby(['Mes', 'Año']).size().unstack(level=1, fill_value=0)
+
+        # Calcular la variación porcentual mes a mes
+        variacion_porcentual = egresos.pct_change().fillna(0) * 100
+
         fig, ax = plt.subplots(figsize=(12, 6))
         egresos.plot(ax=ax)
 
         nivel_ideal = 2000
         ax.axhline(y=nivel_ideal, color='r', linestyle='--', linewidth=2, label='Nivel Ideal')
-        ax.set_title(f'Egresos Mensuales {max_anio-1} vs {max_anio})')
+
+        # Añadir marcas para la variación porcentual
+        for year, color in zip(egresos.columns, ['#4CAF50', '#2196F3']):
+            if year in variacion_porcentual.columns:
+                ax.scatter(egresos.index, egresos[year] + variacion_porcentual[year], color=color, alpha=0.6, label=f'Variación % {year}')
+
+        ax.set_title(f'Egresos Mensuales {max_anio-1} vs {max_anio} con Variación Porcentual')
         ax.set_xlabel('Mes')
         ax.set_ylabel('Cantidad de Egresos')
         ax.legend(title='Año')
@@ -144,7 +165,7 @@ class AnalisisCohortes:
         fig.savefig(buf, format='png')
         plt.close(fig)
         buf.seek(0)
-        resultados['linea_egresos_mensuales_comparativo.png'] = buf.getvalue()
+        resultados['linea_egresos_mensuales_comparativo1.png'] = buf.getvalue()
         if update_progress:
             update_progress()
         # Barras promedio estancia por grupo etario
@@ -175,6 +196,52 @@ class AnalisisCohortes:
 
             if update_progress:
                 update_progress()
+        # Gráfico de líneas comparativas entre periodos diferenciando por tipo de actividad
+        if 'Tipo Actividad' in df.columns and 'Mes' in df.columns and 'Año' in df.columns:
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            # Filtrar datos para los años más recientes
+            df_filtrado = df[df['Año'].isin([max_anio - 1, max_anio])]
+
+            # Crear tabla pivotante para contar los egresos por tipo de actividad y mes
+            pivot = df_filtrado.pivot_table(index='Mes', columns=['Tipo Actividad', 'Año'], values='Egresos', aggfunc='sum', fill_value=0)
+
+            # Calcular la variación porcentual mes a mes
+            variacion_porcentual = pivot.pct_change().fillna(0) * 100
+
+            # Dibujar líneas para cada tipo de actividad y año
+            for tipo_actividad in pivot.columns.levels[0]:
+                for year, color in zip([max_anio - 1, max_anio], ['#4CAF50', '#2196F3']):
+                    if (tipo_actividad, year) in pivot.columns:
+                        ax.plot(pivot.index, pivot[(tipo_actividad, year)], marker='o', linestyle='-', color=color, label=f'{tipo_actividad} ({year})')
+
+                        # Añadir marcas para la variación porcentual
+                        if (tipo_actividad, year) in variacion_porcentual.columns:
+                            ax.scatter(pivot.index, pivot[(tipo_actividad, year)] + variacion_porcentual[(tipo_actividad, year)], color=color, alpha=0.6, label=f'Variación % {tipo_actividad} ({year})')
+
+            # Configurar etiquetas y título
+            ax.set_title('Evolución Mensual por Tipo de Actividad con Variación Porcentual')
+            ax.set_xlabel('Mes')
+            ax.set_ylabel('Cantidad de Egresos')
+            ax.set_xticks(range(1, max_mes + 1))
+            ax.set_xticklabels([
+                'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+            ][:max_mes])
+            ax.legend(title='Indicadores', loc='upper left', bbox_to_anchor=(1, 1))
+
+            # Ajustar diseño
+            plt.tight_layout()
+
+            # Guardar gráfico en buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', bbox_inches='tight')
+            plt.close(fig)
+            buf.seek(0)
+
+            resultados['lineas_comparativas_tipo_actividad.png'] = buf.getvalue()
+            if update_progress:
+                update_progress()
         return resultados
 
     def ejecutar_analisis(self, df: pd.DataFrame, update_progress=None):
@@ -184,4 +251,4 @@ class AnalisisCohortes:
 
     @staticmethod
     def get_total_steps():
-        return 5
+        return 7

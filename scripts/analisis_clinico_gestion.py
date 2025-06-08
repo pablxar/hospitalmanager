@@ -70,34 +70,66 @@ class AnalisisClinicoGestion:
         anios_comparar = [max_anio - 1, max_anio]
 
         df_comp = df[df['Año'].isin(anios_comparar) & (df['Mes'] <= max_mes)].copy()
-        # Boxplot de Estancia del Episodio por "Prevision (Desc)"
-        if 'Estancia del Episodio' in df.columns and 'Prevision (Desc)' in df.columns:
-            fig, ax = plt.subplots()
-            df.boxplot(column='Estancia del Episodio', by='Prevision (Desc)', grid=False, ax=ax)
-            ax.set_title('Distribución de Estancia por Previsión')
-            ax.set_xlabel('Previsión')
-            ax.set_ylabel('Estancia del Episodio')
-            plt.suptitle('')
+        # Gráfico de barras horizontales apiladas para distribución de estancia por tipo de ingreso
+        if 'Estancia del Episodio' in df.columns and 'Tipo Ingreso (Descripción)' in df.columns:
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            # Agrupar datos por tipo de ingreso y calcular la suma de estancias
+            agrupado = df.groupby('Tipo Ingreso (Descripción)')['Estancia del Episodio'].sum().sort_values(ascending=False)
+
+            # Colores predefinidos para los tipos de ingreso
+            colores = ['#FFEB3B', '#4CAF50', '#2196F3']
+
+            # Crear gráfico de barras horizontales
+            ax.barh(agrupado.index, agrupado.values, color=colores[:len(agrupado)])
+
+            # Configurar etiquetas y título
+            ax.set_title('Distribución de Estancia por Tipo de Ingreso')
+            ax.set_xlabel('Total de Estancia del Episodio')
+            ax.set_ylabel('Tipo de Ingreso')
+
+            # Ajustar diseño
+            plt.tight_layout()
+
+            # Guardar gráfico en buffer
             buf = io.BytesIO()
-            fig.savefig(buf, format='png')
+            plt.savefig(buf, format='png', bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
-            resultados['boxplot_estancia_por_prevision.png'] = buf.getvalue()
+
+            resultados['barras_estancia_por_tipo_ingreso.png'] = buf.getvalue()
             if update_progress:
                 update_progress()
+        
         # Scatter Peso GRD vs Estancia del Episodio (en lugar de Valor a Pagar)
         if 'Peso GRD' in df.columns and 'Estancia del Episodio' in df.columns:
-            fig, ax = plt.subplots()
-            ax.scatter(df['Peso GRD'], df['Estancia del Episodio'])
-            ax.set_title('Relación entre Peso GRD y Estancia del Episodio')
+            fig, ax = plt.subplots(figsize=(10, 6))
+
+            # Obtener los tipos de ingreso únicos
+            tipos_ingreso = df['Tipo Ingreso (Descripción)'].dropna().unique()
+            colores = plt.cm.tab10.colors  # Usar una paleta de colores predefinida
+
+            # Crear gráfico de dispersión para cada tipo de ingreso
+            for tipo, color in zip(tipos_ingreso, colores):
+                df_tipo = df[df['Tipo Ingreso (Descripción)'] == tipo]
+                ax.scatter(df_tipo['Peso GRD'], df_tipo['Estancia del Episodio'], label=tipo, color=color, alpha=0.7)
+
+            # Configurar etiquetas y título
+            ax.set_title('Relación entre Peso GRD y Estancia del Episodio por Tipo de Ingreso')
             ax.set_xlabel('Peso GRD')
             ax.set_ylabel('Estancia del Episodio')
+            ax.legend(title='Tipo de Ingreso')
+
+            # Ajustar diseño
+            plt.tight_layout()
+
+            # Guardar gráfico en buffer
             buf = io.BytesIO()
-            fig.savefig(buf, format='png')
+            plt.savefig(buf, format='png', bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
-            resultados['scatter_peso_vs_estancia.png'] = buf.getvalue()
 
+            resultados['scatter_peso_vs_estancia_tipo_ingreso.png'] = buf.getvalue()
             if update_progress:
                 update_progress()
         
@@ -150,6 +182,41 @@ class AnalisisClinicoGestion:
             resultados['grafico_egresos_comparativo_mejorado.png'] = buf.getvalue()
             if update_progress:
                 update_progress()
+        # Gráfico de dispersión comparativo para Peso GRD vs Estancia del Episodio por Tipo de Ingreso entre 2024 y 2025
+        if 'Peso GRD' in df.columns and 'Estancia del Episodio' in df.columns and 'Tipo Ingreso (Descripción)' in df.columns:
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            # Filtrar datos para los años 2024 y 2025
+            df_filtrado = df[df['Año'].isin([2024, 2025])]
+
+            # Obtener los tipos de ingreso únicos
+            tipos_ingreso = df_filtrado['Tipo Ingreso (Descripción)'].dropna().unique()
+            colores = plt.cm.tab10.colors  # Usar una paleta de colores predefinida
+
+            # Crear gráfico de dispersión para cada tipo de ingreso y año
+            for tipo, color in zip(tipos_ingreso, colores):
+                for year, marker in zip([2024, 2025], ['o', 's']):
+                    df_tipo_year = df_filtrado[(df_filtrado['Tipo Ingreso (Descripción)'] == tipo) & (df_filtrado['Año'] == year)]
+                    ax.scatter(df_tipo_year['Peso GRD'], df_tipo_year['Estancia del Episodio'], label=f'{tipo} ({year})', color=color, alpha=0.7, marker=marker)
+
+            # Configurar etiquetas y título
+            ax.set_title('Relación entre Peso GRD y Estancia del Episodio por Tipo de Ingreso (2024 vs 2025)')
+            ax.set_xlabel('Peso GRD')
+            ax.set_ylabel('Estancia del Episodio')
+            ax.legend(title='Tipo de Ingreso y Año', loc='upper right', bbox_to_anchor=(1.3, 1))
+
+            # Ajustar diseño
+            plt.tight_layout()
+
+            # Guardar gráfico en buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', bbox_inches='tight')
+            plt.close(fig)
+            buf.seek(0)
+
+            resultados['scatter_peso_vs_estancia_comparativo.png'] = buf.getvalue()
+            if update_progress:
+                update_progress()
         return resultados
 
         
@@ -162,4 +229,4 @@ class AnalisisClinicoGestion:
 
     @staticmethod
     def get_total_steps():
-        return 3
+        return 5
