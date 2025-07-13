@@ -1,6 +1,12 @@
 import flet as ft
+import sqlite3
+import shutil
+import zipfile
+import os
+from datetime import datetime
 from components.notifications import NotificationsManager
 from components.popup_analisis import PopupAnalisisManager
+from components.report_generator import PopupReportGenerator
 
 class HomeView(ft.Container):
     def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager, user):
@@ -14,9 +20,6 @@ class HomeView(ft.Container):
         self.page.bgcolor = bg_color
         self.notifications_manager = notifications_manager
         self.user = user
-
-        # Elimina la línea: self.popup, self.file_picker = crear_popup_analisis(self.page, self.user)
-        # self.page.dialog = self.popup
 
         self.content = ft.Column(
             scroll=ft.ScrollMode.AUTO,
@@ -55,7 +58,7 @@ class HomeView(ft.Container):
             controls=[
                 self.create_feature_card("Nuevo Análisis", "Accede a la creación de nuevos análisis", ft.Icons.ADD, self.on_new_analysis_click),
                 self.create_feature_card("Registro de Documentos", "Pronto disponible...", ft.Icons.DESCRIPTION),
-                self.create_feature_card("Generación de Informes", "Pronto disponible...", ft.Icons.ANALYTICS),
+                self.create_feature_card("Generación de Informes", "Genera informes en base a análisis recientes", ft.Icons.ANALYTICS, self.on_generate_report_click),
                 self.create_feature_card("Pronto disponible...", "", ft.Icons.HOURGLASS_EMPTY),
                 self.create_feature_card("Pronto disponible...", "", ft.Icons.HOURGLASS_EMPTY)
             ]
@@ -85,6 +88,19 @@ class HomeView(ft.Container):
         # Usar el nuevo manager de clase para el popup
         popup_manager = PopupAnalisisManager(self.page, self.user)
         self.popup, self.file_picker = popup_manager.popup, popup_manager.file_picker
+        self.popup.alignment = ft.alignment.center
+
+        if self.popup not in self.page.overlay:
+            self.page.overlay.append(self.popup)
+
+        self.popup.open = True
+        self.page.dialog = self.popup
+        self.page.update()
+
+    def on_generate_report_click(self, e):
+        # Usar el nuevo manager de clase para el popup
+        report_manager = PopupReportGenerator(self.page, self.user, 'app_data.db')
+        self.popup = report_manager.popup
         self.popup.alignment = ft.alignment.center
 
         if self.popup not in self.page.overlay:

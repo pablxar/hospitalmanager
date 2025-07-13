@@ -27,10 +27,10 @@ class DatabaseManager:
 
     def tables_exist(self):
         """Verifica si las tablas ya existen en la base de datos."""
-        query = "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('usuarios', 'analyses');"
+        query = "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('usuarios', 'analyses', 'reports');"
         with self.connection:
             result = self.connection.execute(query).fetchall()
-        return len(result) == 2  # Devuelve True si ambas tablas existen
+        return len(result) == 3  # Devuelve True si todas las tablas existen
 
     def create_tables(self):
         with self.connection:
@@ -51,6 +51,14 @@ class DatabaseManager:
                     date TEXT NOT NULL,
                     file_content BLOB NOT NULL,
                     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+                )
+            """)
+            self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    report BLOB NOT NULL
                 )
             """)
 

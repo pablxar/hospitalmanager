@@ -6,11 +6,13 @@ from zipfile import ZipFile
 from datetime import datetime
 from database import DatabaseManager
 import matplotlib.pyplot as plt
+import os
 
 from scripts.analisis_produccion import AnalisisProduccion
 from scripts.analisis_economico import AnalisisEconomico
 from scripts.analisis_clinico_gestion import AnalisisClinicoGestion
 from scripts.analisis_cohortes import AnalisisCohortes
+from components.reportlab_generator import generar_pdf
 
 class PopupAnalisisManager:
     def __init__(self, page: ft.Page, user):
@@ -248,6 +250,10 @@ class PopupAnalisisManager:
             self.progress_bar.visible = False
             self.progress_text.visible = False
             self.zip_buffer = self.crear_zip_en_memoria()
+            # Llamar a la función de generación de PDF después de crear el zip
+            output_path = "output_path"
+            os.makedirs(output_path, exist_ok=True)
+            generar_pdf("Analisis", "path_to_images", output_path)
             self.download_btn.visible = True
             self.download_btn.disabled = False
             self.status_text.value = "¡Análisis finalizado! Puedes descargar los resultados."

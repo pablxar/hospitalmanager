@@ -381,7 +381,7 @@ class AnalisisProduccion:
             plt.savefig(buf, format='png', bbox_inches='tight')
             plt.close(fig)
             buf.seek(0)
-            resultados['barras_egresos_por_hospital_y_año.png'] = buf.getvalue()
+            resultados['barras_egresos_por_hospital_y_ano.png'] = buf.getvalue()
             if update_progress:
                 update_progress()
         if 'Hospital (Descripción)' in df.columns and 'Tipo Actividad' in df.columns:
