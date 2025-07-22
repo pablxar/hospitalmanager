@@ -10,6 +10,7 @@ from views.reports import ReportsView
 from views.settings import SettingsView
 from views.account import AccountView
 
+
 class MainApp(ft.Container):
     def __init__(self, page: ft.Page):
         super().__init__(expand=True)
