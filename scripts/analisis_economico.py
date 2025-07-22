@@ -501,4 +501,4 @@ class AnalisisEconomico:
 
     @staticmethod
     def get_total_steps():
-        return 12
+        return 15  # Total de pasos para el análisis económico

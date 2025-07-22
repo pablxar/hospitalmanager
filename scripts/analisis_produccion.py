@@ -628,8 +628,7 @@ class AnalisisProduccion:
 
     @staticmethod
     def get_total_steps():
-        return 18
-        
+        return 13
 
 def configurar_grafico(ax):
     """
