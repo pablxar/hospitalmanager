@@ -54,7 +54,7 @@ class HomeView(ft.Container):
         return ft.Row(
             wrap=True,  # Permite que las tarjetas se ajusten automáticamente en filas
             spacing=20,
-            run_spacing=20,
+            run_spacing=20, 
             controls=[
                 self.create_feature_card("Nuevo Análisis", "Accede a la creación de nuevos análisis", ft.Icons.ADD, self.on_new_analysis_click),
                 self.create_feature_card("Registro de Documentos", "Pronto disponible...", ft.Icons.DESCRIPTION),

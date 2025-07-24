@@ -28,7 +28,7 @@ class DashboardView(ft.Container):
             alignment=ft.MainAxisAlignment.CENTER,
             controls=[
                 ft.Text("Dashboard", color=self.text_color, size=24, weight=ft.FontWeight.BOLD),
-                ft.Icon(ft.icons.DASHBOARD, color=self.text_color, size=32)
+                ft.Icon(ft.Icons.DASHBOARD, color=self.text_color, size=32)
             ]
         )
     

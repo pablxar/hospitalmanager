@@ -86,10 +86,12 @@ class DatabaseManager:
 
     def fetch_analyses_by_user(self, usuario_id):
         with self.connection:
-            return self.connection.execute(
-                "SELECT id, name, date FROM analyses WHERE usuario_id = ? ORDER BY date DESC",
+            results = self.connection.execute(
+                "SELECT id, name, date, file_content FROM analyses WHERE usuario_id = ? ORDER BY date DESC",
                 (usuario_id,)
             ).fetchall()
+            # Ensure file_content is returned as bytes
+            return [(id, name, date, bytes(file_content)) for id, name, date, file_content in results]
 
     def fetch_analysis_file(self, analysis_id):
         with self.connection:

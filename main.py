@@ -6,7 +6,7 @@ from components.header import Header
 from components.sidebar import Sidebar
 from components.notifications import NotificationsManager
 from views.home import HomeView
-from views.reports import ReportsView
+from views.analytics import AnalyticsView
 from views.settings import SettingsView
 from views.account import AccountView
 
@@ -72,7 +72,7 @@ class MainApp(ft.Container):
 
         self.views = {
             "home": HomeView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
-            "reports": ReportsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
+            "analytics": AnalyticsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
             "settings": SettingsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
             "account": AccountView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user, self.auth_manager, self.on_login_success),
         }
@@ -107,7 +107,7 @@ class MainApp(ft.Container):
 
     def setup_sidebar_events(self):
         self.sidebar.home_btn.on_click = lambda e: self.change_view("home")
-        self.sidebar.reports_btn.on_click = lambda e: self.change_view("reports")
+        self.sidebar.analytics_btn.on_click = lambda e: self.change_view("analytics")
         self.sidebar.settings_btn.on_click = lambda e: self.change_view("settings")
         self.sidebar.account_btn.on_click = lambda e: self.change_view("account")
 
@@ -115,7 +115,7 @@ class MainApp(ft.Container):
         self.body.content.controls[1] = self.views[view_name]
         self.sidebar.update_content(
             home_selected=(view_name == "home"),
-            reports_selected=(view_name == "reports"),
+            analytics_selected=(view_name == "analytics"),
             settings_selected=(view_name == "settings"),
             account_selected=(view_name == "account"),
         )

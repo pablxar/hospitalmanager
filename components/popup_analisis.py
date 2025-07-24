@@ -286,13 +286,21 @@ class PopupAnalisisManager:
             try:
                 with open(e.path, "wb") as f:
                     f.write(self.zip_buffer.getbuffer())
+                
+                self.zip_buffer.seek(0)  # Resetear el buffer para futuras lecturas
+                zip_bytes = self.zip_buffer.read()
+                
+                # 3. Debug: Verificar el contenido
+                print(f"[DEBUG] Longitud del ZIP: {len(zip_bytes)} bytes")  # Debe ser > 0
+                print(f"[DEBUG] Primeros bytes: {zip_bytes[:10]}")  # Debe empezar con b'PK\x03\x04' (cabecera ZIP)
+                    
                 now = datetime.now()
                 analysis_name = f"Analisis_{now.strftime('%Y-%m-%d_%H-%M-%S')}"
                 self.db_manager.insert_analysis(
                     usuario_id=self.user[0],
                     name=analysis_name,
                     date=now.strftime('%Y-%m-%d %H:%M:%S'),
-                    file_content=self.zip_buffer.read()
+                    file_content=zip_bytes
                 )
                 snackbar = ft.SnackBar(content=ft.Text("Análisis guardado correctamente", color=ft.Colors.WHITE), bgcolor="#4CAF50", behavior=ft.SnackBarBehavior.FLOATING)
                 self.page.overlay.append(snackbar)
