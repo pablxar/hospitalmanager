@@ -562,16 +562,17 @@ class AnalisisProduccion:
             
             # Configuración del título y leyenda
             titulo = f'Evolución Mensual de Egresos por Hospital ({año})'
-            fig.suptitle(titulo, fontsize=16, fontweight='semibold', y=0.95)
+            fig.suptitle(titulo, fontsize=16, fontweight='semibold', y=1.0)
             
             # Posicionar leyenda justo debajo del título
             leg = ax.legend(
                 loc='upper center',
-                bbox_to_anchor=(0.5, 0.95),  # Ajustado para estar justo debajo del título
+                bbox_to_anchor=(0.5, 1.1),  # Ajustado para estar justo debajo del título
                 ncol=min(3, n_hospitales),  # Máximo 3 columnas
                 frameon=True,
                 framealpha=0.8,
-                edgecolor='none'
+                edgecolor='none',
+                borderaxespad=0.5
             )
             
             # Configuración de ejes
@@ -601,7 +602,7 @@ class AnalisisProduccion:
             
             # Ajustar layout
             plt.tight_layout()
-            plt.subplots_adjust(top=0.85)  # Espacio para título y leyenda
+            plt.subplots_adjust(top=0.88)  # Espacio para título y leyenda
             
             # Guardar gráfico
             buf = io.BytesIO()
