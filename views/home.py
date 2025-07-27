@@ -9,7 +9,7 @@ from components.popup_analisis import PopupAnalisisManager
 from components.report_generator import PopupReportGenerator
 
 class HomeView(ft.Container):
-    def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager, user):
+    def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager, user, change_view):
         super().__init__(expand=True)
         self.page = page
         self.bg_color = bg_color
@@ -20,6 +20,7 @@ class HomeView(ft.Container):
         self.page.bgcolor = bg_color
         self.notifications_manager = notifications_manager
         self.user = user
+        self.change_view = change_view
 
         self.content = ft.Column(
             scroll=ft.ScrollMode.AUTO,
@@ -56,7 +57,7 @@ class HomeView(ft.Container):
             spacing=20,
             run_spacing=20, 
             controls=[
-                self.create_feature_card("Nuevo Análisis", "Accede a la creación de nuevos análisis", ft.Icons.ADD, self.on_new_analysis_click),
+                self.create_feature_card("Nuevo Análisis", "Accede a la creación de nuevos análisis", ft.Icons.ADD, self.change_view_to_analysis),
                 self.create_feature_card("Registro de Documentos", "Pronto disponible...", ft.Icons.DESCRIPTION),
                 self.create_feature_card("Generación de Informes", "Genera informes en base a análisis recientes", ft.Icons.ANALYTICS, self.on_generate_report_click),
                 self.create_feature_card("Pronto disponible...", "", ft.Icons.HOURGLASS_EMPTY),
@@ -64,6 +65,9 @@ class HomeView(ft.Container):
             ]
         )
 
+    def change_view_to_analysis(self, e):
+        self.change_view("analytics")
+        
     def create_feature_card(self, title: str, description: str, icon: str, on_click=None):
         return ft.Card(
             elevation=5,
@@ -84,19 +88,6 @@ class HomeView(ft.Container):
                 on_click=on_click
             )
         )
-    def on_new_analysis_click(self, e):
-        # Usar el nuevo manager de clase para el popup
-        popup_manager = PopupAnalisisManager(self.page, self.user)
-        self.popup, self.file_picker = popup_manager.popup, popup_manager.file_picker
-        self.popup.alignment = ft.alignment.center
-
-        if self.popup not in self.page.overlay:
-            self.page.overlay.append(self.popup)
-
-        self.popup.open = True
-        self.page.dialog = self.popup
-        self.page.update()
-
     def on_generate_report_click(self, e):
         # Usar el nuevo manager de clase para el popup
         report_manager = PopupReportGenerator(self.page, self.user, 'app_data.db')
@@ -123,6 +114,20 @@ class HomeView(ft.Container):
                 ]
             )
         )
+
+def on_new_analysis_click(page, user):
+    # Usar el nuevo manager de clase para el popup
+    popup_manager = PopupAnalisisManager(page, user)
+    popup, file_picker = popup_manager.popup, popup_manager.file_picker
+    file_picker.allowed_extensions = ["xlsx", "csv"]
+    popup.alignment = ft.alignment.center
+
+    if popup not in page.overlay:
+        page.overlay.append(popup)
+
+    popup.open = True
+    page.dialog = popup
+    page.update()
 
 
 

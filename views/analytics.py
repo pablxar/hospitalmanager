@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import flet as ft
 from components.notifications import NotificationsManager
 from database import DatabaseManager
+from views import home  # Corrected the import path
 
 class AnalyticsView(ft.Container):
     def __init__(self, page: ft.Page, bg_color: str, text_color: str, white_color: str, notify_color: str, text_color2: str, notifications_manager: NotificationsManager, user):
@@ -31,7 +32,7 @@ class AnalyticsView(ft.Container):
         
         # Contenido principal con pestañas
         self.tabs = ft.Tabs(
-            scrollable= ft.ScrollMode.AUTO,
+            scrollable=False,  # Deshabilitar scroll interno en las pestañas
             selected_index=0,
             animation_duration=300,
             tabs=[
@@ -42,14 +43,19 @@ class AnalyticsView(ft.Container):
         )
 
         self.content = ft.Column(
-            scroll=ft.ScrollMode.AUTO,  # Scroll controlado
+            scroll=ft.ScrollMode.AUTO,  # Scroll controlado en la columna principal
             expand=True,
+            spacing=20,
             controls=[
                 self.create_header(),
                 self.create_steps_section(),
-                self.tabs
+                self.tabs  # Directly include tabs in the column
             ]
         )
+
+        # Configurar scroll en las pestañas individuales
+        self.tabs.tabs[0].content.scroll = None  # Remove individual scroll settings
+        self.tabs.tabs[1].content.scroll = None
 
     def create_header(self):
         return ft.Row(
@@ -137,8 +143,6 @@ class AnalyticsView(ft.Container):
         return ft.Container(
             padding=20,
             content=ft.Column(
-                scroll =ft.ScrollMode.AUTO,  # Enable controlled scrolling
-                expand=True,
                 spacing=25,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
@@ -202,7 +206,7 @@ class AnalyticsView(ft.Container):
                                                     icon=ft.Icons.FILE_UPLOAD,
                                                     bgcolor=self.notify_color,
                                                     color=self.white_color,
-                                                    on_click=self.on_file_select
+                                                    on_click=lambda e: home.on_new_analysis_click(self.page, self.user)  # Correctly reference the standalone function
                                                 )
                                             ]
                                         )
@@ -284,48 +288,70 @@ class AnalyticsView(ft.Container):
                 ]
             )
         )
-        
-    def on_file_select(self, e):
-        self.file_picker.pick_files(
-            allow_multiple=False,
-            allowed_extensions=["xlsx", "xls", "csv"],
-            dialog_title="Seleccionar archivo de datos"
-        )
 
     def create_history_section(self):
         return ft.Container(
             padding=20,
             content=ft.Column(
-                scroll=ft.ScrollMode.AUTO,  # Enable controlled scrolling
-                expand=True,
+                spacing=20,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     ft.Text("Historial", size=20, weight="bold", color=self.white_color),
                     ft.Divider(height=1, color="#e0e0e0"),
+                    # Botón de recarga
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.END,
+                        controls=[
+                            ft.IconButton(
+                                icon=ft.Icons.REFRESH,
+                                tooltip="Recargar historial",
+                                on_click=self.reload_history
+                            )
+                        ]
+                    ),
                     self.create_report_list()
                 ]
             )
         )
 
     def create_report_list(self):
-        analyses = self.db_manager.fetch_analyses_by_user(self.user[0])
-        if not analyses:
-            return ft.Column(
-                alignment=ft.MainAxisAlignment.CENTER,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                controls=[
-                    ft.Icon(name=ft.Icons.HISTORY, size=50, color=self.white_color),
-                    ft.Text("No hay análisis realizados aún", size=16, color=self.white_color)
+        # Mostrar indicador de carga inicial
+        loading_indicator = ft.ProgressBar()
+        report_list = ft.Column(controls=[loading_indicator])
+        
+        # Cargar datos en el hilo principal (evitamos problemas con SQLite)
+        try:
+            analyses = self.db_manager.fetch_analyses_by_user(self.user[0])
+            if not analyses:
+                report_list.controls = [
+                    ft.Column(
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            ft.Icon(name=ft.Icons.HISTORY, size=50, color=self.white_color),
+                            ft.Text("No hay análisis realizados aún", size=16, color=self.white_color)
+                        ]
+                    )
                 ]
-            )
-
-        return ft.ListView(
-            expand=True,
-            spacing=10,
-            controls=[
-                self.create_report_item(analysis[1], analysis[2], analysis[3], analysis[0])
-                for analysis in analyses
+            else:
+                # Usar ListView para mejor rendimiento
+                list_view = ft.ListView(
+                    expand=True,
+                    spacing=10,
+                    controls=[
+                        self.create_report_item(analysis[1], analysis[2], analysis[3], analysis[0])
+                        for analysis in analyses
+                    ]
+                )
+                report_list.controls = [list_view]
+        except Exception as e:
+            report_list.controls = [
+                ft.Text(f"Error al cargar el historial: {str(e)}", color="red")
             ]
-        )
+        
+        self.page.update()
+        return report_list
+    
     def create_report_item(self, title: str, date: str, file_content: bytes, analysis_id=None):
             # Asegurarse de que file_content sean los bytes del ZIP, no el ID
         if not isinstance(file_content, bytes):
@@ -367,15 +393,20 @@ class AnalyticsView(ft.Container):
         )
         
     def show_delete_dialog(self, title, analysis_id):
+        def handle_delete(e):
+            self.delete_dialog.open = False
+            self.page.update()
+            self.confirm_delete(analysis_id, title)
+        
         self.delete_dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("Confirmar eliminación"),
             content=ft.Text(f"¿Estás seguro de que deseas eliminar el análisis '{title}'?"),
             actions=[
-                ft.TextButton("Cancelar", on_click=self.close_dialogs),
+                ft.TextButton("Cancelar", on_click=lambda e: setattr(self.delete_dialog, 'open', False)),
                 ft.TextButton(
                     "Eliminar", 
-                    on_click=lambda e: self.confirm_delete(analysis_id, title),
+                    on_click=handle_delete,
                     style=ft.ButtonStyle(color=ft.Colors.RED)
                 ),
             ],
@@ -465,3 +496,8 @@ class AnalyticsView(ft.Container):
             allowed_extensions=["zip"]
         )
         self.close_dialogs()
+
+    def reload_history(self, e):
+        """Recarga la sección de historial."""
+        self.tabs.tabs[1].content = self.create_history_section()
+        self.page.update()

@@ -23,7 +23,7 @@ class Header(ft.Container):
                 ft.Row(
                     controls=[
                         ft.Text(
-                            "Olga Moraga - Manager App",
+                            "Hospital Analytics Manager App",
                             text_align=ft.TextAlign.CENTER,
                             size=20,
                             color=text_color,

@@ -29,11 +29,12 @@ class PopupAnalisisManager:
         self.progress_text = ft.Text("0/0", size=16, visible=False)
         self.error_text = ft.Text("", color=ft.Colors.RED, visible=False)
         self.download_btn = ft.ElevatedButton("Descargar Resultados", visible=False)
-        self.upload_btn = ft.ElevatedButton("Subir Base de Datos", on_click=lambda e: self.file_picker.pick_files())
+        self.upload_btn = ft.ElevatedButton("Subir Base de Datos", on_click=self.abrir_selector_archivos)
         self.close_btn = ft.IconButton(icon=ft.Icons.CLOSE, on_click=self.cerrar_popup)
 
-        self.file_picker = ft.FilePicker(on_result=self.ejecutar_analisis)
+        self.file_picker = ft.FilePicker()
         self.page.overlay.append(self.file_picker)
+        self.page.update()
 
         self.status_text = ft.Text("", size=16, color=ft.Colors.AMBER, visible=False)
         self.indeterminate_bar = ft.ProgressBar(width=400, visible=False, color=ft.Colors.AMBER, bgcolor=ft.Colors.with_opacity(0.2, ft.Colors.AMBER), bar_height=4, value=None)
@@ -62,6 +63,59 @@ class PopupAnalisisManager:
         )
 
         self.download_btn.on_click = self.descargar_resultados
+    
+    def abrir_selector_archivos(self, e):
+        """Abre el diálogo para seleccionar archivos con los filtros correctos"""
+        try:
+            self.file_picker.pick_files(
+                allow_multiple=False,
+                allowed_extensions=["xlsx", "xls", "csv"],
+                dialog_title="Seleccionar archivo de datos (XLSX, XLS, CSV)",
+                initial_directory="/"
+            )
+            # Asignar el manejador de resultados después de abrir el picker
+            self.file_picker.on_result = self.handle_file_result
+        except Exception as ex:
+            print(f"Error al abrir selector: {ex}")
+            self.error_text.value = f"Error al abrir selector de archivos: {ex}"
+            self.error_text.visible = True
+            self.popup.update()
+
+    def handle_file_result(self, e: ft.FilePickerResultEvent):
+        """Maneja el resultado de la selección de archivos con validaciones"""
+        if not e.files:
+            return
+            
+        file = e.files[0]
+        ext = file.name.split('.')[-1].lower()
+        
+        # Validar tipo de archivo
+        if ext not in ["xlsx", "xls", "csv"]:
+            self.error_text.value = "Solo se permiten archivos Excel (.xlsx, .xls) o CSV (.csv)"
+            self.error_text.visible = True
+            self.status_text.visible = False
+            self.indeterminate_bar.visible = False
+            self.popup.update()
+            return
+            
+        # Validar tamaño (10MB máximo)
+        if file.size > 10 * 1024 * 1024:
+            self.error_text.value = "El archivo es demasiado grande (máximo 10MB)"
+            self.error_text.visible = True
+            self.status_text.visible = False
+            self.indeterminate_bar.visible = False
+            self.popup.update()
+            return
+            
+        # Si pasa validaciones, proceder con el análisis
+        self.status_text.value = f"Procesando {file.name}..."
+        self.status_text.visible = True
+        self.indeterminate_bar.visible = True
+        self.error_text.visible = False
+        self.popup.update()
+        
+        # Ejecutar análisis
+        self.ejecutar_analisis(e)
     
     def crear_zip_en_memoria(self):
         zip_buffer = io.BytesIO()
@@ -166,6 +220,24 @@ class PopupAnalisisManager:
         self.popup.update()
 
     def ejecutar_analisis(self, e):
+        """Método existente con validación adicional inicial"""
+        if not self.file_picker.result.files:
+            self.error_text.value = "No se seleccionó ningún archivo."
+            self.error_text.visible = True
+            self.status_text.visible = False
+            self.indeterminate_bar.visible = False
+            self.popup.update()
+            return
+            
+        file = self.file_picker.result.files[0]
+        ext = file.name.split('.')[-1].lower()
+        if ext not in ["xlsx", "xls", "csv"]:
+            self.error_text.value = "Tipo de archivo no soportado"
+            self.error_text.visible = True
+            self.status_text.visible = False
+            self.indeterminate_bar.visible = False
+            self.popup.update()
+            return
         if self.file_picker.result.files:
             path = self.file_picker.result.files[0].path
             try:
@@ -289,10 +361,6 @@ class PopupAnalisisManager:
                 
                 self.zip_buffer.seek(0)  # Resetear el buffer para futuras lecturas
                 zip_bytes = self.zip_buffer.read()
-                
-                # 3. Debug: Verificar el contenido
-                print(f"[DEBUG] Longitud del ZIP: {len(zip_bytes)} bytes")  # Debe ser > 0
-                print(f"[DEBUG] Primeros bytes: {zip_bytes[:10]}")  # Debe empezar con b'PK\x03\x04' (cabecera ZIP)
                     
                 now = datetime.now()
                 analysis_name = f"Analisis_{now.strftime('%Y-%m-%d_%H-%M-%S')}"

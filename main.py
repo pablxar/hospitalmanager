@@ -71,7 +71,7 @@ class MainApp(ft.Container):
         self.sidebar = Sidebar(self.page, self.sidebar_color, self.text_color, self.bg_color, self.selected_color)
 
         self.views = {
-            "home": HomeView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
+            "home": HomeView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user, self.change_view),
             "analytics": AnalyticsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
             "settings": SettingsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
             "account": AccountView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user, self.auth_manager, self.on_login_success),
