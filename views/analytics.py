@@ -59,7 +59,8 @@ class AnalyticsView(ft.Container):
 
     def create_header(self):
         return ft.Row(
-            alignment=ft.MainAxisAlignment.CENTER,
+            alignment=ft.MainAxisAlignment.START,
+            spacing=10,
             controls=[
                 ft.Text("Análisis de Datos", color=self.text_color, size=24, weight=ft.FontWeight.BOLD),
                 ft.Icon(ft.Icons.ANALYTICS, color=self.notify_color, size=32)

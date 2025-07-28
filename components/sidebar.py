@@ -13,7 +13,7 @@ class Sidebar(ft.Container):
         # Guardar los iconos como atributos para acceder luego
         self.home_btn = ft.IconButton(icon=ft.Icons.HOME, icon_color=text_color)
         self.analytics_btn = ft.IconButton(icon=ft.Icons.ANALYTICS, icon_color=text_color)
-        self.grafics_btn = ft.IconButton(icon=ft.Icons.SHOW_CHART, icon_color=text_color)
+        self.reports_btn = ft.IconButton(icon=ft.Icons.REPORT, icon_color=text_color)
         self.settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS, icon_color=text_color)
         self.account_btn = ft.IconButton(icon=ft.Icons.PERSON, icon_color=text_color)
 
@@ -31,7 +31,7 @@ class Sidebar(ft.Container):
         self.update_content()
         self.update()
 
-    def update_content(self, home_selected=False, analytics_selected=False, grafics_selected=False, settings_selected=False, account_selected=False):
+    def update_content(self, home_selected=False, analytics_selected=False, reports_selected=False, settings_selected=False, account_selected=False):
         # Actualizar el contenido de la sidebar según el estado expandido
         self.bgcolor = self.sidebar_color  # Aplicar el color de fondo de la sidebar
         self.content = ft.Column(
@@ -41,7 +41,7 @@ class Sidebar(ft.Container):
                 ft.Column([
                     self.create_button(self.home_btn, "Inicio", is_selected=home_selected),
                     self.create_button(self.analytics_btn, "Análisis", is_selected=analytics_selected),
-                    self.create_button(self.grafics_btn, "Gráficos", is_selected=grafics_selected),
+                    self.create_button(self.reports_btn, "Informes", is_selected=reports_selected),
                     self.toggle_btn  # Botón para expandir/colapsar
                 ]),
                 ft.Column([

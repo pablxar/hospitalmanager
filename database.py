@@ -56,11 +56,25 @@ class DatabaseManager:
             self.connection.execute("""
                 CREATE TABLE IF NOT EXISTS reports (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    usuario_id INTEGER NOT NULL,
                     name TEXT NOT NULL,
                     date TEXT NOT NULL,
-                    report BLOB NOT NULL
+                    report BLOB NOT NULL,
+                    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
                 )
             """)
+
+    def update_reports_table(self):
+        """Agrega la columna usuario_id a la tabla reports si no existe."""
+        with self.connection:
+            # Verificar si la columna usuario_id ya existe
+            columns = self.connection.execute("PRAGMA table_info(reports)").fetchall()
+            column_names = [column[1] for column in columns]
+            if "usuario_id" not in column_names:
+                self.connection.execute("ALTER TABLE reports ADD COLUMN usuario_id INTEGER NOT NULL DEFAULT 1")
+                self.connection.execute("PRAGMA foreign_keys = ON")
+                self.connection.execute("UPDATE reports SET usuario_id = 1")  # Asignar un valor por defecto
+                print("Columna usuario_id agregada a la tabla reports.")
 
     # Usuarios
     def insert_user(self, username, password_hash, email, fecha_registro):
@@ -82,6 +96,13 @@ class DatabaseManager:
             self.connection.execute(
                 "INSERT INTO analyses (usuario_id, name, date, file_content) VALUES (?, ?, ?, ?)",
                 (usuario_id, name, date, file_content)
+            )
+            
+    def insert_report(self, user_id, analysis_id, content):
+        with self.connection:
+            self.connection.execute(
+                "INSERT INTO reports (usuario_id, name, date, report) VALUES (?, ?, datetime('now'), ?)",
+                (user_id, f"Informe de {analysis_id}", content)
             )
 
     def fetch_analyses_by_user(self, usuario_id):
@@ -105,6 +126,23 @@ class DatabaseManager:
             self.connection.execute(
                 "DELETE FROM analyses WHERE id = ?",
                 (analysis_id,)
+            )
+
+    # Reports
+    def fetch_reports_by_user(self, usuario_id):
+        with self.connection:
+            results = self.connection.execute(
+                "SELECT id, name, date, report FROM reports WHERE usuario_id = ? ORDER BY date DESC",
+                (usuario_id,)
+            ).fetchall()
+            # Retornar los resultados directamente sin convertir a bytes
+            return [(id, name, date, report) for id, name, date, report in results]
+    
+    def delete_report_by_id(self, report_id):
+        with self.connection:
+            self.connection.execute(
+                "DELETE FROM reports WHERE id = ?",
+                (report_id,)
             )
 
     def close(self):

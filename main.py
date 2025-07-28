@@ -9,6 +9,7 @@ from views.home import HomeView
 from views.analytics import AnalyticsView
 from views.settings import SettingsView
 from views.account import AccountView
+from views.reports import ReportsView
 
 
 class MainApp(ft.Container):
@@ -73,6 +74,7 @@ class MainApp(ft.Container):
         self.views = {
             "home": HomeView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user, self.change_view),
             "analytics": AnalyticsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
+            "reports": ReportsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user, self.db_manager),
             "settings": SettingsView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user),
             "account": AccountView(self.page, self.bg_color, self.text_color, self.white_color, self.notify_color, self.text_color2, self.notifications_manager, self.user, self.auth_manager, self.on_login_success),
         }
@@ -108,6 +110,7 @@ class MainApp(ft.Container):
     def setup_sidebar_events(self):
         self.sidebar.home_btn.on_click = lambda e: self.change_view("home")
         self.sidebar.analytics_btn.on_click = lambda e: self.change_view("analytics")
+        self.sidebar.reports_btn.on_click = lambda e: self.change_view("reports")
         self.sidebar.settings_btn.on_click = lambda e: self.change_view("settings")
         self.sidebar.account_btn.on_click = lambda e: self.change_view("account")
 
@@ -116,6 +119,7 @@ class MainApp(ft.Container):
         self.sidebar.update_content(
             home_selected=(view_name == "home"),
             analytics_selected=(view_name == "analytics"),
+            reports_selected=(view_name == "reports"),
             settings_selected=(view_name == "settings"),
             account_selected=(view_name == "account"),
         )
